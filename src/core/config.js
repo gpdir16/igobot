@@ -1,55 +1,55 @@
-import { readFileSync, existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync, existsSync } from "node:fs";
+import { resolve } from "node:path";
 
 /**
  * 앱 설정 로더
  * .env 파일과 auth.json을 통합하여 단일 config 객체 제공
  */
 class Config {
-  constructor() {
-    this._cache = {};
-    this.load();
-  }
-
-  load() {
-    // auth.json에서 Codex 토큰 로드
-    const authPath = resolve(process.cwd(), 'auth.json');
-    if (existsSync(authPath)) {
-      try {
-        const raw = readFileSync(authPath, 'utf-8');
-        this._cache.auth = JSON.parse(raw);
-      } catch {
-        this._cache.auth = null;
-      }
+    constructor() {
+        this._cache = {};
+        this.load();
     }
-  }
 
-  get telegram() {
-    return {
-      token: process.env.TELEGRAM_BOT_TOKEN,
-      allowedUsers: (process.env.TELEGRAM_ALLOWED_USERS || '')
-        .split(',')
-        .map(id => id.trim())
-        .filter(Boolean)
-    };
-  }
+    load() {
+        // auth.json에서 Codex 토큰 로드
+        const authPath = resolve(process.cwd(), "auth.json");
+        if (existsSync(authPath)) {
+            try {
+                const raw = readFileSync(authPath, "utf-8");
+                this._cache.auth = JSON.parse(raw);
+            } catch {
+                this._cache.auth = null;
+            }
+        }
+    }
 
-  get llm() {
-    return {
-      model: process.env.LLM_MODEL || 'codex-mini-latest',
-      reasoningEffort: process.env.LLM_REASONING_EFFORT || 'medium',
-    };
-  }
+    get telegram() {
+        return {
+            token: process.env.TELEGRAM_BOT_TOKEN,
+            allowedUsers: (process.env.TELEGRAM_ALLOWED_USERS || "")
+                .split(",")
+                .map((id) => id.trim())
+                .filter(Boolean),
+        };
+    }
 
-  get auth() {
-    return this._cache.auth?.tokens || null;
-  }
+    get llm() {
+        return {
+            model: process.env.LLM_MODEL || "codex-mini-latest",
+            reasoningEffort: process.env.LLM_REASONING_EFFORT || "medium",
+        };
+    }
 
-  get agent() {
-    return {
-      maxIterations: parseInt(process.env.AGENT_MAX_ITERATIONS || '20', 10),
-    };
-  }
+    get auth() {
+        return this._cache.auth?.tokens || null;
+    }
+
+    get agent() {
+        return {
+            maxIterations: parseInt(process.env.AGENT_MAX_ITERATIONS || "20", 10),
+        };
+    }
 }
 
 // 싱글턴

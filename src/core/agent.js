@@ -1,9 +1,9 @@
-import CodexClient from '../llm/codex-client.js';
-import ModuleLoader from './module-loader.js';
-import config from './config.js';
-import memoryStore from './memory.js';
-import { needsCompression, compressContext } from './context-compressor.js';
-import logger from '../utils/logger.js';
+import CodexClient from "../llm/codex-client.js";
+import ModuleLoader from "./module-loader.js";
+import config from "./config.js";
+import memoryStore from "./memory.js";
+import { needsCompression, compressContext } from "./context-compressor.js";
+import logger from "../utils/logger.js";
 
 const SYSTEM_PROMPT = `당신은 igobot이라는 자율 AI 에이전트입니다.
 사용자의 요청을 수행하기 위해 제공된 도구들을 자유롭게 사용하세요.
@@ -48,310 +48,311 @@ const SYSTEM_PROMPT = `당신은 igobot이라는 자율 AI 에이전트입니다
  * - 메모리 적극 활용
  */
 class Agent {
-  constructor() {
-    this.llm = new CodexClient();
-    this.moduleLoader = new ModuleLoader();
-    /** @type {Map<number, Array>} chatId별 대화 이력 */
-    this.conversations = new Map();
-    /** @type {Map<number, Array>} chatId별 대기 메시지 큐 (에이전트 실행 중 들어온 새 메시지) */
-    this.pendingMessages = new Map();
-    /** @type {Map<number, boolean>} chatId별 에이전트 실행 중 여부 */
-    this.running = new Map();
+    constructor() {
+        this.llm = new CodexClient();
+        this.moduleLoader = new ModuleLoader();
+        /** @type {Map<number, Array>} chatId별 대화 이력 */
+        this.conversations = new Map();
+        /** @type {Map<number, Array>} chatId별 대기 메시지 큐 (에이전트 실행 중 들어온 새 메시지) */
+        this.pendingMessages = new Map();
+        /** @type {Map<number, boolean>} chatId별 에이전트 실행 중 여부 */
+        this.running = new Map();
 
-    // 텔레그램 봇 인터페이스 (index.js에서 주입)
-    /** @type {import('../telegram/bot.js').default|null} */
-    this.bot = null;
-  }
-
-  async init() {
-    await this.moduleLoader.loadTools();
-    logger.info(`에이전트 초기화 완료 (도구 ${this.moduleLoader.tools.size}개)`);
-  }
-
-  getConversation(chatId) {
-    if (!this.conversations.has(chatId)) {
-      this.conversations.set(chatId, []);
-    }
-    return this.conversations.get(chatId);
-  }
-
-  resetConversation(chatId) {
-    this.conversations.delete(chatId);
-    this.pendingMessages.delete(chatId);
-    this.llm.resetSession();
-    logger.info(`대화 초기화: ${chatId}`);
-  }
-
-  /**
-   * 대기 중인 새 메시지를 컨텍스트에 반영
-   */
-  _drainPendingMessages(chatId, messages) {
-    const queue = this.pendingMessages.get(chatId);
-    if (!queue || queue.length === 0) return false;
-
-    let drained = false;
-    while (queue.length > 0) {
-      const msg = queue.shift();
-      messages.push({ role: 'user', content: msg.text || `[${msg.type}]` });
-      drained = true;
-    }
-    return drained;
-  }
-
-  /**
-   * 사용자 메시지 처리
-   * 동시 메시지 지원: 이미 실행 중이면 큐에 추가하여 다음 도구 호출 후 컨텍스트에 포함
-   */
-  async handleMessage(chatId, userMsg) {
-    const messageText = typeof userMsg === 'string' ? userMsg : (userMsg.text || `[${userMsg.type}]`);
-
-    // 이미 에이전트가 실행 중이면 큐에 추가
-    if (this.running.get(chatId)) {
-      if (!this.pendingMessages.has(chatId)) {
-        this.pendingMessages.set(chatId, []);
-      }
-      this.pendingMessages.get(chatId).push(
-        typeof userMsg === 'string' ? { type: 'text', text: userMsg } : userMsg
-      );
-      logger.info(`[${chatId}] 에이전트 실행 중 — 대기 큐에 추가: ${messageText.slice(0, 50)}`);
-      if (this.bot) {
-        await this.bot.setReaction(chatId, userMsg.messageId || 0, '👀');
-      }
-      return;
+        // 텔레그램 봇 인터페이스 (index.js에서 주입)
+        /** @type {import('../telegram/bot.js').default|null} */
+        this.bot = null;
     }
 
-    this.running.set(chatId, true);
-
-    try {
-      await this._runAgentLoop(chatId, userMsg);
-    } finally {
-      this.running.set(chatId, false);
-
-      // 대기 큐에 남은 메시지가 있으면 다시 실행
-      const queue = this.pendingMessages.get(chatId);
-      if (queue && queue.length > 0) {
-        const nextMsg = queue.shift();
-        // 재귀적으로 실행 (비동기)
-        this.handleMessage(chatId, nextMsg).catch(err => {
-          logger.error('대기 메시지 처리 오류:', err);
-        });
-      }
-    }
-  }
-
-  /**
-   * 실제 에이전트 루프
-   */
-  async _runAgentLoop(chatId, userMsg) {
-    const messages = this.getConversation(chatId);
-    const messageText = typeof userMsg === 'string' ? userMsg : (userMsg.text || `[${userMsg.type}]`);
-
-    // 사진 메시지의 경우 URL 포함
-    let userContent = messageText;
-    if (userMsg.type === 'photo' && userMsg.photoUrl) {
-      userContent = `[사진 업로드됨: ${userMsg.photoUrl}]\n${messageText}`;
-    } else if (userMsg.type === 'document' && userMsg.fileUrl) {
-      userContent = `[문서 업로드됨: ${userMsg.fileName} — ${userMsg.fileUrl}]\n${messageText}`;
-    } else if (userMsg.type === 'voice') {
-      userContent = `[음성 메시지: ${userMsg.fileUrl || ''}]\n${messageText}`;
+    async init() {
+        await this.moduleLoader.loadTools();
+        logger.info(`에이전트 초기화 완료 (도구 ${this.moduleLoader.tools.size}개)`);
     }
 
-    messages.push({ role: 'user', content: userContent });
-
-    // 메모리를 시스템 프롬프트에 포함
-    const memorySummary = memoryStore.getSummaryForPrompt(chatId);
-    const instructions = SYSTEM_PROMPT + memorySummary;
-
-    const tools = this.moduleLoader.getToolSchemas();
-    const maxIterations = config.agent.maxIterations;
-    let iteration = 0;
-
-    // 도구 사용 기록
-    const toolHistory = [];
-
-    // 스트리밍 메시지
-    let streamMsgId = null;
-    if (this.bot) {
-      streamMsgId = await this.bot.startStream(chatId);
-    }
-
-    // 스트리밍 업데이트 throttle
-    let lastStreamUpdate = 0;
-    const STREAM_INTERVAL = 1500; // ms
-
-    while (iteration < maxIterations) {
-      iteration++;
-      logger.info(`에이전트 루프 ${iteration}/${maxIterations}`);
-
-      // 컨텍스트 압축 체크
-      if (needsCompression(messages)) {
-        logger.info('컨텍스트 압축 시작...');
-        if (this.bot && streamMsgId) {
-          await this.bot.updateStream(chatId, streamMsgId, '🔄 대화 내용을 정리하고 있습니다...');
+    getConversation(chatId) {
+        if (!this.conversations.has(chatId)) {
+            this.conversations.set(chatId, []);
         }
-        const compressed = await compressContext(messages, this.llm);
-        messages.length = 0;
-        messages.push(...compressed);
-        this.conversations.set(chatId, messages);
-      }
+        return this.conversations.get(chatId);
+    }
 
-      // typing 표시
-      if (this.bot) await this.bot.sendTyping(chatId);
+    resetConversation(chatId) {
+        this.conversations.delete(chatId);
+        this.pendingMessages.delete(chatId);
+        this.llm.resetSession();
+        logger.info(`대화 초기화: ${chatId}`);
+    }
 
-      try {
-        // 스트리밍 콜백 설정
-        const onDelta = (text) => {
-          if (this.bot && streamMsgId) {
-            const now = Date.now();
-            if (now - lastStreamUpdate > STREAM_INTERVAL) {
-              lastStreamUpdate = now;
-              this.bot.updateStream(chatId, streamMsgId, text).catch(() => {});
+    /**
+     * 대기 중인 새 메시지를 컨텍스트에 반영
+     */
+    _drainPendingMessages(chatId, messages) {
+        const queue = this.pendingMessages.get(chatId);
+        if (!queue || queue.length === 0) return false;
+
+        let drained = false;
+        while (queue.length > 0) {
+            const msg = queue.shift();
+            messages.push({ role: "user", content: msg.text || `[${msg.type}]` });
+            drained = true;
+        }
+        return drained;
+    }
+
+    /**
+     * 사용자 메시지 처리
+     * 동시 메시지 지원: 이미 실행 중이면 큐에 추가하여 다음 도구 호출 후 컨텍스트에 포함
+     */
+    async handleMessage(chatId, userMsg) {
+        const messageText = typeof userMsg === "string" ? userMsg : userMsg.text || `[${userMsg.type}]`;
+
+        // 이미 에이전트가 실행 중이면 큐에 추가
+        if (this.running.get(chatId)) {
+            if (!this.pendingMessages.has(chatId)) {
+                this.pendingMessages.set(chatId, []);
             }
-          }
-        };
-
-        const response = await this.llm.chat({
-          instructions,
-          messages,
-          tools,
-          onDelta
-        });
-
-        // 도구 호출
-        if (response.toolCalls.length > 0) {
-          // 스트리밍 메시지에 도구 사용 중 표시
-          if (this.bot && streamMsgId) {
-            const toolNames = response.toolCalls.map(t => t.name).join(', ');
-            await this.bot.updateStream(chatId, streamMsgId, `🔧 도구 사용 중: ${toolNames}`);
-          }
-
-          for (const toolCall of response.toolCalls) {
-            logger.info(`도구 호출: ${toolCall.name}`);
-
-            messages.push({
-              type: 'function_call',
-              name: toolCall.name,
-              arguments: toolCall.arguments,
-              call_id: toolCall.call_id
-            });
-
-            let args;
-            try {
-              args = typeof toolCall.arguments === 'string'
-                ? JSON.parse(toolCall.arguments)
-                : toolCall.arguments;
-            } catch {
-              const errMsg = `도구 인자 파싱 실패: ${toolCall.arguments}`;
-              messages.push({ role: 'tool', call_id: toolCall.call_id, content: errMsg });
-              toolHistory.push({ name: toolCall.name, args: toolCall.arguments, result: errMsg });
-              continue;
+            this.pendingMessages.get(chatId).push(typeof userMsg === "string" ? { type: "text", text: userMsg } : userMsg);
+            logger.info(`[${chatId}] 에이전트 실행 중 — 대기 큐에 추가: ${messageText.slice(0, 50)}`);
+            if (this.bot) {
+                await this.bot.setReaction(chatId, userMsg.messageId || 0, "👀");
             }
-
-            // 승인 필요 여부 (트러스트 모드이면 자동 승인)
-            const tool = this.moduleLoader.getTool(toolCall.name);
-            const yolo = this.bot?.yoloRuns?.has(chatId);
-            if (tool?.requiresApproval && this.bot && !yolo) {
-              const approved = await this.bot.requestApproval(chatId, toolCall.name, args);
-              if (!approved) {
-                const denyMsg = '사용자가 실행을 거부했습니다.';
-                messages.push({ role: 'tool', call_id: toolCall.call_id, content: denyMsg });
-                toolHistory.push({ name: toolCall.name, args, result: denyMsg });
-                continue;
-              }
-            }
-
-            // 도구 실행
-            try {
-              const result = await this.moduleLoader.executeTool(toolCall.name, args, { chatId, bot: this.bot });
-
-              // 사진 자동 전송 (browser_screenshot 등)
-              let resultStr;
-              if (result && typeof result === 'object' && result.__type === 'photo') {
-                if (this.bot) {
-                  try {
-                    await this.bot.sendPhoto(chatId, result.path, result.caption || '');
-                  } catch (photoErr) {
-                    logger.error('사진 자동 전송 실패:', photoErr);
-                  }
-                }
-                resultStr = `스크린샷이 사용자에게 전송되었습니다. (경로: ${result.path})`;
-              } else {
-                resultStr = typeof result === 'string' ? result : JSON.stringify(result);
-              }
-
-              messages.push({ role: 'tool', call_id: toolCall.call_id, content: resultStr });
-              toolHistory.push({ name: toolCall.name, args, result: resultStr });
-            } catch (err) {
-              logger.error(`도구 실행 오류: ${toolCall.name}`, err);
-              const errStr = `도구 실행 오류: ${err.message}`;
-              messages.push({ role: 'tool', call_id: toolCall.call_id, content: errStr });
-              toolHistory.push({ name: toolCall.name, args, result: errStr });
-            }
-          }
-
-          // 도구 실행 후, 대기 메시지를 컨텍스트에 반영
-          this._drainPendingMessages(chatId, messages);
-
-          continue; // 다음 루프
+            return;
         }
 
-        // 텍스트 응답 (루프 종료)
-        if (response.text) {
-          messages.push({ role: 'assistant', content: response.text });
+        this.running.set(chatId, true);
 
-          if (this.bot && streamMsgId) {
-            // 도구 기록이 있으면 버튼 포함, 없으면 일반
-            await this.bot.finishStream(chatId, streamMsgId, response.text,
-              toolHistory.length > 0 ? toolHistory : null);
-            streamMsgId = null;
-          }
-        } else if (this.bot && streamMsgId) {
-          // 빈 응답 — 드래프트 제거
-          try {
-            await this.bot.bot.telegram.callApi('sendMessageDraft', {
-              chat_id: chatId, draft_id: streamMsgId, text: ' '
-            });
-          } catch {}
-          streamMsgId = null;
+        try {
+            await this._runAgentLoop(chatId, userMsg);
+        } finally {
+            this.running.set(chatId, false);
+
+            // 대기 큐에 남은 메시지가 있으면 다시 실행
+            const queue = this.pendingMessages.get(chatId);
+            if (queue && queue.length > 0) {
+                const nextMsg = queue.shift();
+                // 재귀적으로 실행 (비동기)
+                this.handleMessage(chatId, nextMsg).catch((err) => {
+                    logger.error("대기 메시지 처리 오류:", err);
+                });
+            }
+        }
+    }
+
+    /**
+     * 실제 에이전트 루프
+     */
+    async _runAgentLoop(chatId, userMsg) {
+        const messages = this.getConversation(chatId);
+        const messageText = typeof userMsg === "string" ? userMsg : userMsg.text || `[${userMsg.type}]`;
+
+        // 사진 메시지의 경우 URL 포함
+        let userContent = messageText;
+        if (userMsg.type === "photo" && userMsg.photoUrl) {
+            userContent = `[사진 업로드됨: ${userMsg.photoUrl}]\n${messageText}`;
+        } else if (userMsg.type === "document" && userMsg.fileUrl) {
+            userContent = `[문서 업로드됨: ${userMsg.fileName} — ${userMsg.fileUrl}]\n${messageText}`;
+        } else if (userMsg.type === "voice") {
+            userContent = `[음성 메시지: ${userMsg.fileUrl || ""}]\n${messageText}`;
         }
 
-        // 정상 완료 — yolo 해제
-        this.bot?.yoloRuns?.delete(chatId);
-        break;
-      } catch (err) {
-        logger.error('에이전트 루프 오류:', err);
-        this.bot?.yoloRuns?.delete(chatId);
+        messages.push({ role: "user", content: userContent });
+
+        // 메모리를 시스템 프롬프트에 포함
+        const memorySummary = memoryStore.getSummaryForPrompt(chatId);
+        const instructions = SYSTEM_PROMPT + memorySummary;
+
+        const tools = this.moduleLoader.getToolSchemas();
+        const maxIterations = config.agent.maxIterations;
+        let iteration = 0;
+
+        // 도구 사용 기록
+        const toolHistory = [];
+
+        // 스트리밍 메시지
+        let streamMsgId = null;
         if (this.bot) {
-          if (streamMsgId) {
-            // 드래프트 제거 후 에러 메시지 전송
-            try {
-              await this.bot.bot.telegram.callApi('sendMessageDraft', {
-                chat_id: chatId, draft_id: streamMsgId, text: ' '
-              });
-            } catch {}
-            streamMsgId = null;
-          }
-          await this.bot.send(chatId, `⚠️ 에이전트 오류: ${err.message}`);
+            streamMsgId = await this.bot.startStream(chatId);
         }
-        break;
-      }
-    }
 
-    if (iteration >= maxIterations) {
-      logger.warn('에이전트 최대 반복 도달');
-      this.bot?.yoloRuns?.delete(chatId);
-      if (this.bot) {
-        if (streamMsgId) {
-          try {
-            await this.bot.bot.telegram.callApi('sendMessageDraft', {
-              chat_id: chatId, draft_id: streamMsgId, text: ' '
-            });
-          } catch {}
+        // 스트리밍 업데이트 throttle
+        let lastStreamUpdate = 0;
+        const STREAM_INTERVAL = 1500; // ms
+
+        while (iteration < maxIterations) {
+            iteration++;
+            logger.info(`에이전트 루프 ${iteration}/${maxIterations}`);
+
+            // 컨텍스트 압축 체크
+            if (needsCompression(messages)) {
+                logger.info("컨텍스트 압축 시작...");
+                if (this.bot && streamMsgId) {
+                    await this.bot.updateStream(chatId, streamMsgId, "🔄 대화 내용을 정리하고 있습니다...");
+                }
+                const compressed = await compressContext(messages, this.llm);
+                messages.length = 0;
+                messages.push(...compressed);
+                this.conversations.set(chatId, messages);
+            }
+
+            // typing 표시
+            if (this.bot) await this.bot.sendTyping(chatId);
+
+            try {
+                // 스트리밍 콜백 설정
+                const onDelta = (text) => {
+                    if (this.bot && streamMsgId) {
+                        const now = Date.now();
+                        if (now - lastStreamUpdate > STREAM_INTERVAL) {
+                            lastStreamUpdate = now;
+                            this.bot.updateStream(chatId, streamMsgId, text).catch(() => {});
+                        }
+                    }
+                };
+
+                const response = await this.llm.chat({
+                    instructions,
+                    messages,
+                    tools,
+                    onDelta,
+                });
+
+                // 도구 호출
+                if (response.toolCalls.length > 0) {
+                    // 스트리밍 메시지에 도구 사용 중 표시
+                    if (this.bot && streamMsgId) {
+                        const toolNames = response.toolCalls.map((t) => t.name).join(", ");
+                        await this.bot.updateStream(chatId, streamMsgId, `🔧 도구 사용 중: ${toolNames}`);
+                    }
+
+                    for (const toolCall of response.toolCalls) {
+                        logger.info(`도구 호출: ${toolCall.name}`);
+
+                        messages.push({
+                            type: "function_call",
+                            name: toolCall.name,
+                            arguments: toolCall.arguments,
+                            call_id: toolCall.call_id,
+                        });
+
+                        let args;
+                        try {
+                            args = typeof toolCall.arguments === "string" ? JSON.parse(toolCall.arguments) : toolCall.arguments;
+                        } catch {
+                            const errMsg = `도구 인자 파싱 실패: ${toolCall.arguments}`;
+                            messages.push({ role: "tool", call_id: toolCall.call_id, content: errMsg });
+                            toolHistory.push({ name: toolCall.name, args: toolCall.arguments, result: errMsg });
+                            continue;
+                        }
+
+                        // 승인 필요 여부 (트러스트 모드이면 자동 승인)
+                        const tool = this.moduleLoader.getTool(toolCall.name);
+                        const yolo = this.bot?.yoloRuns?.has(chatId);
+                        if (tool?.requiresApproval && this.bot && !yolo) {
+                            const approved = await this.bot.requestApproval(chatId, toolCall.name, args);
+                            if (!approved) {
+                                const denyMsg = "사용자가 실행을 거부했습니다.";
+                                messages.push({ role: "tool", call_id: toolCall.call_id, content: denyMsg });
+                                toolHistory.push({ name: toolCall.name, args, result: denyMsg });
+                                continue;
+                            }
+                        }
+
+                        // 도구 실행
+                        try {
+                            const result = await this.moduleLoader.executeTool(toolCall.name, args, { chatId, bot: this.bot });
+
+                            // 사진 자동 전송 (browser_screenshot 등)
+                            let resultStr;
+                            if (result && typeof result === "object" && result.__type === "photo") {
+                                if (this.bot) {
+                                    try {
+                                        await this.bot.sendPhoto(chatId, result.path, result.caption || "");
+                                    } catch (photoErr) {
+                                        logger.error("사진 자동 전송 실패:", photoErr);
+                                    }
+                                }
+                                resultStr = `스크린샷이 사용자에게 전송되었습니다. (경로: ${result.path})`;
+                            } else {
+                                resultStr = typeof result === "string" ? result : JSON.stringify(result);
+                            }
+
+                            messages.push({ role: "tool", call_id: toolCall.call_id, content: resultStr });
+                            toolHistory.push({ name: toolCall.name, args, result: resultStr });
+                        } catch (err) {
+                            logger.error(`도구 실행 오류: ${toolCall.name}`, err);
+                            const errStr = `도구 실행 오류: ${err.message}`;
+                            messages.push({ role: "tool", call_id: toolCall.call_id, content: errStr });
+                            toolHistory.push({ name: toolCall.name, args, result: errStr });
+                        }
+                    }
+
+                    // 도구 실행 후, 대기 메시지를 컨텍스트에 반영
+                    this._drainPendingMessages(chatId, messages);
+
+                    continue; // 다음 루프
+                }
+
+                // 텍스트 응답 (루프 종료)
+                if (response.text) {
+                    messages.push({ role: "assistant", content: response.text });
+
+                    if (this.bot && streamMsgId) {
+                        // 도구 기록이 있으면 버튼 포함, 없으면 일반
+                        await this.bot.finishStream(chatId, streamMsgId, response.text, toolHistory.length > 0 ? toolHistory : null);
+                        streamMsgId = null;
+                    }
+                } else if (this.bot && streamMsgId) {
+                    // 빈 응답 — 드래프트 제거
+                    try {
+                        await this.bot.bot.telegram.callApi("sendMessageDraft", {
+                            chat_id: chatId,
+                            draft_id: streamMsgId,
+                            text: " ",
+                        });
+                    } catch {}
+                    streamMsgId = null;
+                }
+
+                // 정상 완료 — yolo 해제
+                this.bot?.yoloRuns?.delete(chatId);
+                break;
+            } catch (err) {
+                logger.error("에이전트 루프 오류:", err);
+                this.bot?.yoloRuns?.delete(chatId);
+                if (this.bot) {
+                    if (streamMsgId) {
+                        // 드래프트 제거 후 에러 메시지 전송
+                        try {
+                            await this.bot.bot.telegram.callApi("sendMessageDraft", {
+                                chat_id: chatId,
+                                draft_id: streamMsgId,
+                                text: " ",
+                            });
+                        } catch {}
+                        streamMsgId = null;
+                    }
+                    await this.bot.send(chatId, `⚠️ 에이전트 오류: ${err.message}`);
+                }
+                break;
+            }
         }
-        await this.bot.send(chatId, '⚠️ 최대 작업 반복에 도달했습니다.');
-      }
+
+        if (iteration >= maxIterations) {
+            logger.warn("에이전트 최대 반복 도달");
+            this.bot?.yoloRuns?.delete(chatId);
+            if (this.bot) {
+                if (streamMsgId) {
+                    try {
+                        await this.bot.bot.telegram.callApi("sendMessageDraft", {
+                            chat_id: chatId,
+                            draft_id: streamMsgId,
+                            text: " ",
+                        });
+                    } catch {}
+                }
+                await this.bot.send(chatId, "⚠️ 최대 작업 반복에 도달했습니다.");
+            }
+        }
     }
-  }
 }
 
 export default Agent;
