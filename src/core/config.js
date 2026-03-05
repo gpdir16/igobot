@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-// 앱 설정 로더 (.env + auth.json 통합)
+// 앱 설정 로더 (.env + auth.json + model.json 통합)
 class Config {
     constructor() {
         this._cache = {};
@@ -19,6 +19,18 @@ class Config {
                 this._cache.auth = null;
             }
         }
+
+        // model.json에서 모델 설정 로드
+        const modelPath = resolve(process.cwd(), "model.json");
+        if (existsSync(modelPath)) {
+            try {
+                this._cache.model = JSON.parse(readFileSync(modelPath, "utf-8"));
+            } catch {
+                this._cache.model = {};
+            }
+        } else {
+            this._cache.model = {};
+        }
     }
 
     get telegram() {
@@ -32,9 +44,10 @@ class Config {
     }
 
     get llm() {
+        const m = this._cache.model;
         return {
-            model: process.env.LLM_MODEL || "codex-mini-latest",
-            reasoningEffort: process.env.LLM_REASONING_EFFORT || "medium",
+            model: m.model || "gpt-5.2",
+            reasoningEffort: m.reasoningEffort || "medium",
         };
     }
 
@@ -44,7 +57,9 @@ class Config {
 
     get agent() {
         return {
-            maxIterations: parseInt(process.env.AGENT_MAX_ITERATIONS || "20", 10),
+            maxIterations: parseInt(process.env.AGENT_MAX_ITERATIONS || "100", 10),
+            // 실제 usage.input_tokens이 이 값의 85%를 넘으면 컨텍스트 압축 실행
+            contextWindow: this._cache.model?.contextWindow || 100000,
         };
     }
 }

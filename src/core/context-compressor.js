@@ -2,7 +2,7 @@ import logger from "../utils/logger.js";
 
 // 컨텍스트 압축기: 오래된 대화를 요약해 토큰 사용량을 줄임
 
-// 대략적 토큰 추정 (한국어 1글자 ≈ 2토큰, 영문 1단어 ≈ 1.3토큰)
+// 폴백용 토큰 추정 (API 실제값이 없을 때만 사용)
 function estimateTokens(text) {
     if (!text) return 0;
     const koreanChars = (text.match(/[\u3131-\uD79D]/g) || []).length;
@@ -24,10 +24,12 @@ function estimateMessagesTokens(messages) {
 }
 
 // 컨텍스트 압축 필요 여부 판단
-export function needsCompression(messages, maxTokens = 80000) {
-    const estimated = estimateMessagesTokens(messages);
-    logger.debug(`컨텍스트 토큰 추정: ${estimated}/${maxTokens}`);
-    return estimated > maxTokens * 0.85; // 85% 이상이면 압축
+// actualInputTokens: Codex API usage.input_tokens 실제값 (없으면 추정값 폴백)
+export function needsCompression(messages, maxTokens = 80000, actualInputTokens = null) {
+    const tokenCount = actualInputTokens !== null && actualInputTokens > 0 ? actualInputTokens : estimateMessagesTokens(messages);
+    const label = actualInputTokens !== null && actualInputTokens > 0 ? "실제" : "추정";
+    logger.debug(`컨텍스트 토큰 ${label}: ${tokenCount}/${maxTokens}`);
+    return tokenCount > maxTokens * 0.85; // 85% 이상이면 압축
 }
 
 // 오래된 메시지는 요약으로 대체하고 최근 메시지는 유지

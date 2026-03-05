@@ -51,7 +51,16 @@ cp .env.example .env
 ```env
 TELEGRAM_BOT_TOKEN=your_bot_token_here
 TELEGRAM_ALLOWED_USERS=your_telegram_user_id (텔레그램 웹에서 저장한 메시지 채팅방에들어가면 주소창에 뜨는 숫자)
-LLM_MODEL=gpt-5.3-codex
+```
+
+LLM 설정은 프로젝트 루트의 `model.json`에서 관리합니다:
+
+```json
+{
+  "model": "gpt-5.2",
+  "contextWindow": 400000,
+  "reasoningEffort": "medium"
+}
 ```
 
 ## 사용법

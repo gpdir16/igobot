@@ -9,6 +9,19 @@ const CODEX_ENDPOINT = "https://chatgpt.com/backend-api/codex/responses";
 class CodexClient {
     constructor() {
         this.sessionId = randomUUID();
+        // context_length_exceeded 에러 발생 시 파싱되어 설정됨 (null이면 미감지)
+        this.contextWindow = null;
+    }
+
+    // 에러 메시지에서 컨텍스트 윈도우 파싱
+    _parseContextWindowFromError(errText) {
+        // "maximum context length is 128000 tokens"
+        const m = errText.match(/(?:maximum |max |context[ _](?:window|length|size)(?:[^\d]*))?(\d{4,7})(?:\s*tokens?)/i);
+        if (m) {
+            const val = parseInt(m[1]);
+            if (val > 1000) return val;
+        }
+        return null;
     }
 
     // 대화 메시지를 Responses API 입력 형식으로 변환
@@ -90,6 +103,12 @@ class CodexClient {
 
         if (!res.ok) {
             const errBody = await res.text();
+            // context length 초과 에러에서 실제 한도 파싱
+            const cw = this._parseContextWindowFromError(errBody);
+            if (cw) {
+                this.contextWindow = cw;
+                logger.info(`컨텍스트 윈도우 감지 (HTTP 에러 파싱): ${cw.toLocaleString()} tokens`);
+            }
             throw new Error(`Codex API 오류 ${res.status}: ${errBody}`);
         }
 
@@ -147,12 +166,31 @@ class CodexClient {
                             }
                             break;
 
-                        case "response.completed":
-                            usage = event.response?.usage || null;
+                        case "response.completed": {
+                            const resp = event.response || {};
+                            usage = resp.usage || null;
+                            const meta = {
+                                id: resp.id,
+                                model: resp.model,
+                                status: resp.status,
+                                truncation: resp.truncation,
+                                service_tier: resp.service_tier,
+                                usage: resp.usage,
+                            };
+                            logger.debug(`response.completed: ${JSON.stringify(meta)}`);
                             break;
+                        }
 
-                        case "response.failed":
-                            throw new Error(`Codex 응답 실패: ${JSON.stringify(event)}`);
+                        case "response.failed": {
+                            const failMsg = JSON.stringify(event);
+                            // context length 초과 에러에서 실제 한도 파싱
+                            const cw = this._parseContextWindowFromError(failMsg);
+                            if (cw) {
+                                this.contextWindow = cw;
+                                logger.info(`컨텍스트 윈도우 감지 (response.failed 파싱): ${cw.toLocaleString()} tokens`);
+                            }
+                            throw new Error(`Codex 응답 실패: ${failMsg}`);
+                        }
                     }
                 } catch (err) {
                     if (err.message.startsWith("Codex")) throw err;
@@ -166,7 +204,9 @@ class CodexClient {
 
         logger.debug(`Codex 응답: text=${text.length}자, toolCalls=${toolCalls.length}, reasoning=${reasoning.length}자`);
         if (usage) {
-            logger.info(`토큰 사용: input=${usage.input_tokens}, output=${usage.output_tokens}`);
+            logger.info(
+                `토큰 사용: input=${usage.input_tokens} (캐시=${usage.input_tokens_details?.cached_tokens ?? 0}), output=${usage.output_tokens} (추론=${usage.output_tokens_details?.reasoning_tokens ?? 0})`,
+            );
         }
 
         return { text, reasoning, toolCalls, usage };

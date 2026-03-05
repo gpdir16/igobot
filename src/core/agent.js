@@ -170,6 +170,9 @@ class Agent {
         // 도구 사용 기록
         const toolHistory = [];
 
+        // API에서 반환된 실제 input 토큰 수 (마지막 성공한 호출 기준)
+        let lastActualInputTokens = null;
+
         // 스트리밍 메시지
         let streamMsgId = null;
         if (this.bot) {
@@ -189,9 +192,14 @@ class Agent {
             for (const msg of preDrained) {
                 if (msg?.messageId) processedMessageIds.add(msg.messageId);
             }
+            if (preDrained.length > 0) {
+                lastActualInputTokens = null;
+            }
 
-            // 컨텍스트 압축 체크
-            if (needsCompression(messages)) {
+            // 컨텍스트 압축 체크 (실제 API 토큰값 우선 사용)
+            // 우선순위: 직전 동일 컨텍스트의 모델 API 실제값 > 추정값
+            const contextWindowLimit = this.llm.contextWindow ?? config.agent.contextWindow;
+            if (needsCompression(messages, contextWindowLimit, lastActualInputTokens)) {
                 logger.info("컨텍스트 압축 시작...");
                 if (this.bot && streamMsgId) {
                     await this.bot.updateStream(chatId, streamMsgId, "🔄 대화 내용을 정리하고 있습니다...");
@@ -200,6 +208,7 @@ class Agent {
                 messages.length = 0;
                 messages.push(...compressed);
                 this.conversations.set(chatId, messages);
+                lastActualInputTokens = null;
             }
 
             // typing 표시
@@ -233,8 +242,16 @@ class Agent {
                     onDelta,
                 });
 
+                // 실제 토큰 사용량 기록 (다음 반복의 압축 판단에 사용)
+                if (response.usage?.input_tokens) {
+                    lastActualInputTokens = response.usage.input_tokens;
+                }
+
                 // 도구 호출
                 if (response.toolCalls.length > 0) {
+                    // 도구 호출이 있으면 메시지 컨텍스트가 바뀌므로 이전 토큰값 무효화
+                    lastActualInputTokens = null;
+
                     // 스트리밍 메시지에 도구 사용 중 표시
                     if (this.bot && streamMsgId) {
                         const toolNames = response.toolCalls.map((t) => t.name).join(", ");
@@ -249,6 +266,7 @@ class Agent {
                         }
                         const drained = drainedMessages.length > 0;
                         if (drained) {
+                            lastActualInputTokens = null;
                             logger.info(`[${chatId}] 새 대기 메시지 우선 처리 — 남은 도구 호출 보류`);
                         }
                         return drained;
