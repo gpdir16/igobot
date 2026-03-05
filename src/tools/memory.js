@@ -1,8 +1,6 @@
 import memoryStore from "../core/memory.js";
 
-/**
- * 메모리 저장 도구
- */
+// 메모리 저장 도구
 export const memorySave = {
     name: "memory_save",
     description: "중요한 정보를 영구 메모리에 저장합니다. 사용자 선호도, 프로젝트 정보, 기억해야 할 사항 등을 저장하세요.",
@@ -28,9 +26,7 @@ export const memorySave = {
     },
 };
 
-/**
- * 메모리 검색 도구
- */
+// 메모리 검색 도구
 export const memorySearch = {
     name: "memory_search",
     description: "저장된 메모리를 검색합니다. 이전에 저장한 정보를 찾을 때 사용하세요.",
@@ -50,9 +46,7 @@ export const memorySearch = {
     },
 };
 
-/**
- * 메모리 삭제 도구
- */
+// 메모리 삭제 도구
 export const memoryDelete = {
     name: "memory_delete",
     description: "저장된 메모리를 삭제합니다.",

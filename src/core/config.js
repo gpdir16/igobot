@@ -1,10 +1,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-/**
- * 앱 설정 로더
- * .env 파일과 auth.json을 통합하여 단일 config 객체 제공
- */
+// 앱 설정 로더 (.env + auth.json 통합)
 class Config {
     constructor() {
         this._cache = {};

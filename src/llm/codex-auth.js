@@ -11,9 +11,7 @@ const REDIRECT_URI = `http://localhost:${REDIRECT_PORT}/auth/callback`;
 const SCOPES = "openid profile email offline_access";
 const AUTH_FILE = resolve(process.cwd(), "auth.json");
 
-/**
- * PKCE code_verifier / code_challenge 생성
- */
+// PKCE code_verifier / code_challenge 생성
 function generatePKCE() {
     const verifier = randomBytes(64).toString("hex");
     const digest = createHash("sha256").update(verifier).digest();
@@ -21,9 +19,7 @@ function generatePKCE() {
     return { verifier, challenge };
 }
 
-/**
- * JWT payload 디코딩 (서명 검증 없음)
- */
+// JWT payload 디코딩 (서명 검증 없음)
 function decodeJwtPayload(token) {
     const parts = token.split(".");
     if (parts.length < 2) throw new Error("올바르지 않은 JWT");
@@ -31,9 +27,7 @@ function decodeJwtPayload(token) {
     return JSON.parse(payload);
 }
 
-/**
- * 저장된 인증 정보 로드
- */
+// 저장된 인증 정보 로드
 export function loadAuth() {
     if (!existsSync(AUTH_FILE)) return null;
     try {
@@ -43,18 +37,13 @@ export function loadAuth() {
     }
 }
 
-/**
- * 인증 정보 저장
- */
+// 인증 정보 저장
 function saveAuth(data) {
     writeFileSync(AUTH_FILE, JSON.stringify(data, null, 2), "utf-8");
     logger.info("인증 정보 저장 완료");
 }
 
-/**
- * OAuth 로그인 (PKCE Authorization Code Flow)
- * 로컬 HTTP 서버를 열고, 사용자가 브라우저에서 인증하면 콜백을 받아 토큰 교환
- */
+// OAuth 로그인 (PKCE Authorization Code Flow)
 export async function login() {
     const { verifier, challenge } = generatePKCE();
     const state = randomBytes(16).toString("hex");
@@ -161,9 +150,7 @@ export async function login() {
     });
 }
 
-/**
- * access_token 갱신
- */
+// access_token 갱신
 export async function refreshToken(authData) {
     const refreshTk = authData?.tokens?.refresh_token;
     if (!refreshTk) throw new Error("refresh_token이 없습니다. 다시 로그인하세요.");
@@ -201,9 +188,7 @@ export async function refreshToken(authData) {
     return authData;
 }
 
-/**
- * 유효한 access_token 보장 (필요 시 자동 갱신)
- */
+// 유효한 access_token 보장 (필요 시 자동 갱신)
 export async function ensureValidToken() {
     let authData = loadAuth();
     if (!authData?.tokens?.access_token) {

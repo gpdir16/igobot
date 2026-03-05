@@ -6,9 +6,7 @@ let _browser = null;
 // 세션 맵: sessionId -> { context, page }
 const _sessions = new Map();
 
-/**
- * Playwright 브라우저 인스턴스를 가져오기 (lazy 로딩)
- */
+// Playwright 브라우저 인스턴스를 가져오기 (lazy 로딩)
 async function getBrowser() {
     if (_browser?.isConnected()) return _browser;
 
@@ -26,10 +24,7 @@ async function getBrowser() {
     return _browser;
 }
 
-/**
- * 세션(BrowserContext + Page)을 가져오기. 없으면 새로 생성.
- * @param {string} sessionId - 세션 식별자
- */
+// 세션(BrowserContext + Page)을 가져오고 없으면 새로 생성
 async function getSession(sessionId = "default") {
     if (_sessions.has(sessionId)) {
         const session = _sessions.get(sessionId);
@@ -52,9 +47,7 @@ async function getSession(sessionId = "default") {
     return session;
 }
 
-/**
- * 특정 세션 종료 (쿠키 포함 완전 삭제)
- */
+// 특정 세션 종료 (쿠키 포함 완전 삭제)
 async function closeSession(sessionId = "default") {
     if (_sessions.has(sessionId)) {
         const { context } = _sessions.get(sessionId);
@@ -66,9 +59,7 @@ async function closeSession(sessionId = "default") {
     return false;
 }
 
-/**
- * 모든 세션 및 브라우저 정리
- */
+// 모든 세션 및 브라우저 정리
 async function closeBrowser() {
     for (const [, { context }] of _sessions) {
         await context.close().catch(() => {});
@@ -86,9 +77,7 @@ process.on("exit", () => {
     _browser?.close();
 });
 
-/**
- * 브라우저 도구: 웹페이지 열기 및 내용 가져오기
- */
+// 브라우저 도구: 웹페이지 열기 및 내용 가져오기
 export const browseFetch = {
     name: "browser_fetch",
     description: "웹페이지를 열고 텍스트 내용을 가져옵니다. sessionId를 지정하면 쿠키/로그인 상태 등 세션이 유지됩니다.",
@@ -134,9 +123,7 @@ export const browseFetch = {
     },
 };
 
-/**
- * 브라우저 도구: 스크린샷 촬영
- */
+// 브라우저 도구: 스크린샷 촬영
 export const browserScreenshot = {
     name: "browser_screenshot",
     description: "웹페이지의 스크린샷을 촬영합니다. 촬영 후 자동으로 사용자에게 텔레그램 사진으로 전송됩니다.",
@@ -176,9 +163,7 @@ export const browserScreenshot = {
     },
 };
 
-/**
- * 브라우저 도구: 페이지 인터랙션 (클릭, 입력 등)
- */
+// 브라우저 도구: 페이지 인터랙션 (클릭, 입력 등)
 export const browserInteract = {
     name: "browser_interact",
     description: "웹페이지에서 클릭, 텍스트 입력 등의 인터랙션을 수행합니다. sessionId로 로그인 세션 유지 가능.",
@@ -252,9 +237,7 @@ export const browserInteract = {
     },
 };
 
-/**
- * 브라우저 도구: 세션 관리
- */
+// 브라우저 도구: 세션 관리
 export const browserSession = {
     name: "browser_session",
     description: "브라우저 세션을 관리합니다. 세션 목록 조회, 쿠키 확인, 세션 종료 등.",
@@ -309,9 +292,7 @@ export const browserSession = {
     },
 };
 
-/**
- * 브라우저 정리 함수도 export
- */
+// 브라우저 정리 함수 export
 export { closeBrowser };
 
 export default [browseFetch, browserScreenshot, browserInteract, browserSession];

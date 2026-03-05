@@ -2,20 +2,13 @@ import { readdirSync } from "node:fs";
 import { resolve, join } from "node:path";
 import logger from "../utils/logger.js";
 
-/**
- * 동적 모듈 로더
- * tools/ 디렉토리의 모듈을 자동으로 탐색하고 로드한다.
- * 각 모듈은 { name, description, schema, execute } 형태를 export해야 한다.
- */
+// 동적 모듈 로더 (tools 디렉토리 자동 탐색/로드)
 class ModuleLoader {
     constructor() {
-        /** @type {Map<string, object>} */
         this.tools = new Map();
     }
 
-    /**
-     * 기본 tools 디렉토리에서 모든 도구 모듈을 로드
-     */
+    // 기본 tools 디렉토리에서 모든 도구 모듈 로드
     async loadTools(toolsDir) {
         const dir = toolsDir || resolve(process.cwd(), "src", "tools");
         const files = readdirSync(dir).filter((f) => f.endsWith(".js") && f !== "index.js");
@@ -43,16 +36,12 @@ class ModuleLoader {
         }
     }
 
-    /**
-     * 도구 이름으로 도구 가져오기
-     */
+    // 도구 이름으로 도구 가져오기
     getTool(name) {
         return this.tools.get(name) || null;
     }
 
-    /**
-     * LLM에 전달할 도구 스키마 목록 생성
-     */
+    // LLM에 전달할 도구 스키마 목록 생성
     getToolSchemas() {
         return Array.from(this.tools.values()).map((tool) => ({
             type: "function",
@@ -62,9 +51,7 @@ class ModuleLoader {
         }));
     }
 
-    /**
-     * 도구 실행
-     */
+    // 도구 실행
     async executeTool(name, args, context = {}) {
         const tool = this.getTool(name);
         if (!tool) throw new Error(`알 수 없는 도구: ${name}`);

@@ -1,10 +1,6 @@
 import logger from "../utils/logger.js";
 
-/**
- * 컨텍스트 압축기
- * 대화 이력이 토큰 한계에 가까워지면 오래된 부분을 요약하여 압축한다.
- * LLM을 호출하여 요약을 생성하므로, codex client 인스턴스를 받아 사용.
- */
+// 컨텍스트 압축기: 오래된 대화를 요약해 토큰 사용량을 줄임
 
 // 대략적 토큰 추정 (한국어 1글자 ≈ 2토큰, 영문 1단어 ≈ 1.3토큰)
 function estimateTokens(text) {
@@ -27,28 +23,14 @@ function estimateMessagesTokens(messages) {
     return total;
 }
 
-/**
- * 컨텍스트 압축이 필요한지 판단
- * @param {Array} messages
- * @param {number} maxTokens - 최대 허용 토큰
- * @returns {boolean}
- */
+// 컨텍스트 압축 필요 여부 판단
 export function needsCompression(messages, maxTokens = 80000) {
     const estimated = estimateMessagesTokens(messages);
     logger.debug(`컨텍스트 토큰 추정: ${estimated}/${maxTokens}`);
     return estimated > maxTokens * 0.85; // 85% 이상이면 압축
 }
 
-/**
- * 대화 이력을 압축한다.
- * - 앞부분(오래된 메시지들)을 LLM에게 요약 시킨 후, 요약 메시지 1개로 대체
- * - 최근 메시지들은 그대로 유지
- *
- * @param {Array} messages - 대화 이력
- * @param {object} llmClient - CodexClient 인스턴스
- * @param {number} keepRecent - 유지할 최근 메시지 수
- * @returns {Promise<Array>} 압축된 메시지 배열
- */
+// 오래된 메시지는 요약으로 대체하고 최근 메시지는 유지
 export async function compressContext(messages, llmClient, keepRecent = 20) {
     if (messages.length <= keepRecent + 5) return messages;
 

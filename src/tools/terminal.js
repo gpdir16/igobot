@@ -1,9 +1,6 @@
 import { exec } from "node:child_process";
 
-/**
- * 터미널 명령 실행 도구
- * 쓰기/실행 작업이므로 승인 필요
- */
+// 터미널 명령 실행 도구 (쓰기/실행 작업이므로 승인 필요)
 export default {
     name: "run_terminal",
     description: "터미널에서 셸 명령을 실행합니다. 명령 결과(stdout/stderr)를 반환합니다.",
@@ -27,11 +24,7 @@ export default {
         required: ["command"],
     },
 
-    /**
-     * @param {object} args
-     * @param {object} context
-     * @returns {Promise<string>}
-     */
+    // args.command/cwd/timeout을 받아 셸 명령 실행 결과 문자열 반환
     execute(args, context = {}) {
         const { command, cwd, timeout = 30000 } = args;
 

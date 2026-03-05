@@ -1,20 +1,11 @@
-/**
- * LLM 마크다운 출력을 Telegram HTML로 변환
- * 텔레그램이 지원하는 HTML 태그: <b>, <i>, <u>, <s>, <code>, <pre>, <a>, <blockquote>
- */
+// LLM 마크다운을 Telegram HTML로 변환하는 유틸
 
-/**
- * HTML 특수문자 이스케이프
- */
+// HTML 특수문자 이스케이프
 export function escapeHtml(str) {
     return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-/**
- * 마크다운을 Telegram HTML로 변환
- * 주의: 이 함수는 입력이 4000자 이내인 경우에만 사용.
- *       긴 텍스트는 splitAndConvert() 사용.
- */
+// 마크다운을 Telegram HTML로 변환 (긴 텍스트는 splitAndConvert 사용)
 export function markdownToTelegramHtml(text) {
     if (!text) return "";
 
@@ -65,15 +56,7 @@ export function markdownToTelegramHtml(text) {
     return processed;
 }
 
-/**
- * 마크다운 텍스트를 안전하게 청크 분할 후 각각 HTML 변환
- *
- * ★ 태그 절대 잔리 없음: HTML 변환 전에 청크를 나누기 때문
- *
- * @param {string} text 마크다운 또는 평문 텍스트
- * @param {number} maxLen 미변환 상태의 구단당 최대 문자 수 (여유 있게 설정)
- * @returns {string[]} HTML 문자열 배열
- */
+// 마크다운 텍스트를 청크로 나눈 뒤 각각 HTML로 변환
 export function splitAndConvert(text, maxLen = 3000) {
     if (!text) return [""];
 
@@ -126,9 +109,7 @@ export function splitAndConvert(text, maxLen = 3000) {
         .filter((html) => html.trim());
 }
 
-/**
- * 텍스트가 마크다운인지 판별
- */
+// 텍스트가 마크다운인지 판별
 export function hasMarkdown(text) {
     return /(\*\*|__|~~|```|`[^`]+`|^#{1,6}\s|^\s*>|\[.+\]\(.+\))/m.test(text);
 }

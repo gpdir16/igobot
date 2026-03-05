@@ -4,29 +4,15 @@ import config from "../core/config.js";
 import logger from "../utils/logger.js";
 import { markdownToTelegramHtml, escapeHtml, splitAndConvert } from "../utils/markdown.js";
 
-/**
- * 텔레그램 봇 모듈
- * - 모든 메시지 타입 수신 (텍스트, 사진, 문서, 스티커, 답장, 리액션 등)
- * - 공식 sendMessageDraft API로 네이티브 스트리밍
- * - 마크다운 → Telegram HTML 자동 변환
- * - 도구 승인: HTML 서식 + 코드 블록 + 고정(알림 없음), 승인/거부 후 삭제
- * - 도구 사용 기록: 버튼 → 기록 메시지, 닫기로 삭제
- * - 동시 메시지 처리 (fire-and-forget)
- */
+// 텔레그램 봇 모듈 (메시지 수신, 승인, 스트리밍, 도구기록 처리)
 class TelegramBot {
     constructor() {
         this.bot = null;
-        /** @type {Map<string, {resolve: Function, msgId: number, chatId: number}>} */
         this._pendingApprovals = new Map();
-        /** @type {Map<string, string[]>} logId → 도구 기록 HTML 청크 배열 */
         this._toolLogs = new Map();
-        /** @type {Map<string, number[]>} logId → 전송된 메시지 ID 배열 */
         this._toolLogMsgIds = new Map();
-        /** @type {Set<number>} 현재 작업에서 YOLO 모드 활성화된 chatId */
         this.yoloRuns = new Set();
-        /** @type {Function|null} */
         this.onMessage = null;
-        /** @type {Function|null} */
         this.onReset = null;
     }
 
@@ -284,10 +270,7 @@ class TelegramBot {
         } catch {}
     }
 
-    /**
-     * 메시지 전송 (마크다운 자동 변환 → HTML)
-     * 태그 절대 짤림 없음: HTML 변환 전 청크 분할
-     */
+    // 메시지 전송 (마크다운 자동 변환 → HTML)
     async send(chatId, text, options = {}) {
         if (!this.bot) return;
         const chunks = splitAndConvert(text, 3000);
@@ -301,10 +284,7 @@ class TelegramBot {
         return lastMsgId;
     }
 
-    /**
-     * 이미 HTML인 텍스트 전송 (변환 없이)
-     * 호출자가 유효한 HTML임을 보장해야 함
-     */
+    // 이미 HTML인 텍스트 전송 (변환 없음)
     async sendHtml(chatId, html, options = {}) {
         if (!this.bot) return;
         // HTML은 이미 변환됨 — 4000자 초과 시만 자름 (입력이 유효 HTML임을 전제)
@@ -410,10 +390,7 @@ class TelegramBot {
 
     // ==================== 승인 ====================
 
-    /**
-     * 승인 요청 (HTML + 코드블록)
-     * 승인/거부 → 메시지 삭제
-     */
+    // 승인 요청 (HTML + 코드블록, 승인/거부 후 메시지 삭제)
     async requestApproval(chatId, toolName, args) {
         const approvalId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const raw = typeof args === "string" ? args : JSON.stringify(args, null, 2);
@@ -503,10 +480,7 @@ class TelegramBot {
 
     // ==================== 스트리밍 (공식 sendMessageDraft API) ====================
 
-    /**
-     * 스트리밍 시작 — draft_id 생성 및 반환
-     * @returns {Promise<number>} draft_id
-     */
+    // 스트리밍 시작: draft_id 생성/반환
     async startStream(chatId) {
         await this.sendTyping(chatId);
         // draft_id는 0이 아닌 고유 정수
@@ -524,9 +498,7 @@ class TelegramBot {
         return draftId;
     }
 
-    /**
-     * 스트리밍 업데이트 — 같은 draft_id로 텍스트 갱신 (애니메이션 전환)
-     */
+    // 스트리밍 업데이트: 같은 draft_id로 텍스트 갱신
     async updateStream(chatId, draftId, text) {
         if (!text || text.length === 0) return;
         const raw = text.length > 3800 ? "..." + text.slice(-3700) : text;
@@ -543,10 +515,7 @@ class TelegramBot {
         }
     }
 
-    /**
-     * 스트리밍 종료 — 최종 메시지를 sendMessage로 확정
-     * @returns {Promise<number>} 최종 메시지 ID
-     */
+    // 스트리밍 종료: 최종 메시지를 sendMessage로 확정
     async finishStream(chatId, draftId, text, toolHistory = null) {
         // 드래프트를 빈 텍스트로 제거 (선택적)
         try {

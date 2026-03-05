@@ -3,10 +3,7 @@ import { resolve } from "node:path";
 
 const WORKSPACE_DIR = resolve(process.cwd(), "data", "workspace");
 
-/**
- * 사용자에게 사진 파일 전송
- * context.bot (TelegramBot 인스턴스) 이 필요함
- */
+// 사용자에게 사진 파일 전송 (context.bot 필요)
 export const sendPhoto = {
     name: "send_photo",
     description: "로컬 파일을 사용자에게 텔레그램 사진으로 전송합니다. 이미지 파일 경로를 지정하세요.",
@@ -38,9 +35,7 @@ export const sendPhoto = {
     },
 };
 
-/**
- * 사용자에게 문서/파일 전송
- */
+// 사용자에게 문서/파일 전송
 export const sendDocument = {
     name: "send_document",
     description: "로컬 파일을 사용자에게 텔레그램 문서로 전송합니다. 모든 파일 형식 지원.",

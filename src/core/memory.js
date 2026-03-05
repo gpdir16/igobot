@@ -4,12 +4,7 @@ import logger from "../utils/logger.js";
 
 const MEMORY_DIR = resolve(process.cwd(), "data", "memory");
 
-/**
- * 메모리 시스템
- * - chatId별 영구 메모리 저장/로드
- * - 에이전트가 도구로 기억 저장/검색/삭제 가능
- * - JSON 파일 기반
- */
+// 메모리 시스템 (chatId별 JSON 기반 저장/검색/삭제)
 class MemoryStore {
     constructor() {
         if (!existsSync(MEMORY_DIR)) {
@@ -35,9 +30,7 @@ class MemoryStore {
         writeFileSync(this._filePath(chatId), JSON.stringify(entries, null, 2), "utf-8");
     }
 
-    /**
-     * 메모리 저장
-     */
+    // 메모리 저장
     add(chatId, key, value, tags = []) {
         const entries = this._load(chatId);
         // 같은 키가 있으면 업데이트
@@ -60,9 +53,7 @@ class MemoryStore {
         return entry;
     }
 
-    /**
-     * 메모리 검색
-     */
+    // 메모리 검색
     search(chatId, query) {
         const entries = this._load(chatId);
         if (!query) return entries;
@@ -72,9 +63,7 @@ class MemoryStore {
         );
     }
 
-    /**
-     * 메모리 삭제
-     */
+    // 메모리 삭제
     remove(chatId, key) {
         const entries = this._load(chatId);
         const filtered = entries.filter((e) => e.key !== key);
@@ -82,23 +71,17 @@ class MemoryStore {
         return entries.length !== filtered.length;
     }
 
-    /**
-     * 전체 메모리 목록
-     */
+    // 전체 메모리 목록
     list(chatId) {
         return this._load(chatId);
     }
 
-    /**
-     * 메모리 전체 삭제
-     */
+    // 메모리 전체 삭제
     clear(chatId) {
         this._save(chatId, []);
     }
 
-    /**
-     * 시스템 프롬프트에 포함할 메모리 요약 생성
-     */
+    // 시스템 프롬프트에 포함할 메모리 요약 생성
     getSummaryForPrompt(chatId) {
         const entries = this._load(chatId);
         if (entries.length === 0) return "";

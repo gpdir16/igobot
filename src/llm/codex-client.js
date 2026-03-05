@@ -5,18 +5,13 @@ import logger from "../utils/logger.js";
 
 const CODEX_ENDPOINT = "https://chatgpt.com/backend-api/codex/responses";
 
-/**
- * Codex API 클라이언트
- * ChatGPT 구독의 Codex OAuth를 통해 LLM 응답을 생성한다.
- */
+// Codex API 클라이언트 (Codex OAuth 기반)
 class CodexClient {
     constructor() {
         this.sessionId = randomUUID();
     }
 
-    /**
-     * 대화 메시지를 Responses API 입력 형식으로 변환
-     */
+    // 대화 메시지를 Responses API 입력 형식으로 변환
     _convertMessages(messages) {
         return messages.map((msg) => {
             if (msg.role === "user") {
@@ -53,15 +48,7 @@ class CodexClient {
         });
     }
 
-    /**
-     * LLM 응답 생성 (SSE 스트림 파싱)
-     * @param {object} options
-     * @param {string} options.instructions - 시스템 프롬프트
-     * @param {Array} options.messages - 대화 메시지
-     * @param {Array} options.tools - 도구 스키마
-     * @param {Function} [options.onDelta] - 텍스트 델타 콜백 (스트리밍용)
-     * @returns {Promise<{text: string, toolCalls: Array, usage: object}>}
-     */
+    // LLM 응답 생성 (SSE 스트림 파싱)
     async chat({ instructions, messages, tools = [], onDelta = null }) {
         const tokens = await ensureValidToken();
 
@@ -109,11 +96,7 @@ class CodexClient {
         return this._parseSSE(res, onDelta);
     }
 
-    /**
-     * SSE 응답 스트림 파싱
-     * @param {Response} response
-     * @param {Function|null} onDelta - 텍스트 델타 콜백
-     */
+    // SSE 응답 스트림 파싱
     async _parseSSE(response, onDelta = null) {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
@@ -189,9 +172,7 @@ class CodexClient {
         return { text, reasoning, toolCalls, usage };
     }
 
-    /**
-     * 새 세션 시작
-     */
+    // 새 세션 시작
     resetSession() {
         this.sessionId = randomUUID();
     }

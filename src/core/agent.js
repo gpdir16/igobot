@@ -39,27 +39,16 @@ const SYSTEM_PROMPT = `당신은 igobot이라는 자율 AI 에이전트입니다
 5. 파일(사진, 문서 등)을 생성/다운로드했으면 사용자에게 텔레그램으로 전송까지 완료하세요.
 6. 한국어로 응답하세요.`;
 
-/**
- * 에이전트 코어
- * - LLM ↔ 도구 실행 루프
- * - 텔레그램 스트리밍 지원
- * - 동시 메시지 처리 (새 메시지를 컨텍스트에 실시간 추가)
- * - 컨텍스트 무한 (자동 압축)
- * - 메모리 적극 활용
- */
+// 에이전트 코어 (LLM-도구 루프, 스트리밍, 컨텍스트 압축, 메모리)
 class Agent {
     constructor() {
         this.llm = new CodexClient();
         this.moduleLoader = new ModuleLoader();
-        /** @type {Map<number, Array>} chatId별 대화 이력 */
         this.conversations = new Map();
-        /** @type {Map<number, Array>} chatId별 대기 메시지 큐 (에이전트 실행 중 들어온 새 메시지) */
         this.pendingMessages = new Map();
-        /** @type {Map<number, boolean>} chatId별 에이전트 실행 중 여부 */
         this.running = new Map();
 
         // 텔레그램 봇 인터페이스 (index.js에서 주입)
-        /** @type {import('../telegram/bot.js').default|null} */
         this.bot = null;
     }
 
@@ -82,9 +71,7 @@ class Agent {
         logger.info(`대화 초기화: ${chatId}`);
     }
 
-    /**
-     * 대기 중인 새 메시지를 컨텍스트에 반영
-     */
+    // 대기 중인 새 메시지를 컨텍스트에 반영
     _drainPendingMessages(chatId, messages) {
         const queue = this.pendingMessages.get(chatId);
         if (!queue || queue.length === 0) return false;
@@ -98,10 +85,7 @@ class Agent {
         return drained;
     }
 
-    /**
-     * 사용자 메시지 처리
-     * 동시 메시지 지원: 이미 실행 중이면 큐에 추가하여 다음 도구 호출 후 컨텍스트에 포함
-     */
+    // 사용자 메시지 처리 (실행 중이면 큐에 적재)
     async handleMessage(chatId, userMsg) {
         const messageText = typeof userMsg === "string" ? userMsg : userMsg.text || `[${userMsg.type}]`;
 
@@ -137,9 +121,7 @@ class Agent {
         }
     }
 
-    /**
-     * 실제 에이전트 루프
-     */
+    // 실제 에이전트 루프
     async _runAgentLoop(chatId, userMsg) {
         const messages = this.getConversation(chatId);
         const messageText = typeof userMsg === "string" ? userMsg : userMsg.text || `[${userMsg.type}]`;

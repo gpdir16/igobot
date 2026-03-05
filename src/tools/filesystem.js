@@ -5,12 +5,9 @@ const WORKSPACE_DIR = resolve(process.cwd(), "data", "workspace");
 // 시작 시 workspace 디렉토리 보장
 if (!existsSync(WORKSPACE_DIR)) mkdirSync(WORKSPACE_DIR, { recursive: true });
 
-/**
- * 파일시스템 도구 모음
- * 읽기 작업은 자율, 쓰기 작업은 승인 필요
- */
+// 파일시스템 도구 모음 (읽기 자율, 쓰기 승인 필요)
 
-/** 읽기 도구: 파일 내용 읽기 */
+// 읽기 도구: 파일 내용 읽기
 export const readFile = {
     name: "read_file",
     description: "파일의 내용을 읽어 반환합니다. 경로와 선택적으로 줄 범위를 지정할 수 있습니다.",
@@ -42,7 +39,7 @@ export const readFile = {
     },
 };
 
-/** 읽기 도구: 디렉토리 내용 목록 */
+// 읽기 도구: 디렉토리 내용 목록
 export const listDir = {
     name: "list_directory",
     description: "디렉토리의 파일과 폴더 목록을 반환합니다.",
@@ -78,7 +75,7 @@ export const listDir = {
     },
 };
 
-/** 읽기 도구: 텍스트 검색 */
+// 읽기 도구: 텍스트 검색
 export const searchFiles = {
     name: "search_files",
     description: "파일들에서 텍스트 패턴을 검색합니다.",
@@ -119,12 +116,12 @@ export const searchFiles = {
                                 }
                             }
                         } catch {
-                            /* 바이너리 파일 등 무시 */
+                            // 바이너리 파일 등 무시
                         }
                     }
                 }
             } catch {
-                /* 권한 오류 무시 */
+                // 권한 오류 무시
             }
         }
         walk(absPath);
@@ -132,7 +129,7 @@ export const searchFiles = {
     },
 };
 
-/** 쓰기 도구: 파일 생성/덮어쓰기 (data/workspace/ 한정) */
+// 쓰기 도구: 파일 생성/덮어쓰기 (data/workspace/ 한정)
 export const writeFile = {
     name: "write_file",
     description:
@@ -159,7 +156,7 @@ export const writeFile = {
     },
 };
 
-/** 쓰기 도구: 파일 삭제 (data/workspace/ 한정) */
+// 쓰기 도구: 파일 삭제 (data/workspace/ 한정)
 export const deleteFile = {
     name: "delete_file",
     description: "파일을 삭제합니다. data/workspace/ 내의 파일만 삭제 가능합니다.",
@@ -182,5 +179,5 @@ export const deleteFile = {
     },
 };
 
-/** 파일시스템 도구를 개별 모듈로 export하지 않고, 배열로 묶어 export */
+// 파일시스템 도구를 개별 모듈로 export하지 않고, 배열로 묶어 export
 export default [readFile, listDir, searchFiles, writeFile, deleteFile];
