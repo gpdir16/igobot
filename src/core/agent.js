@@ -74,20 +74,29 @@ class Agent {
     // 대기 중인 새 메시지를 컨텍스트에 반영
     _drainPendingMessages(chatId, messages) {
         const queue = this.pendingMessages.get(chatId);
-        if (!queue || queue.length === 0) return false;
+        if (!queue || queue.length === 0) return [];
 
-        let drained = false;
+        const drainedMessages = [];
         while (queue.length > 0) {
             const msg = queue.shift();
             messages.push({ role: "user", content: msg.text || `[${msg.type}]` });
-            drained = true;
+            drainedMessages.push(msg);
         }
-        return drained;
+        return drainedMessages;
     }
 
     // 사용자 메시지 처리 (실행 중이면 큐에 적재)
     async handleMessage(chatId, userMsg) {
         const messageText = typeof userMsg === "string" ? userMsg : userMsg.text || `[${userMsg.type}]`;
+        const messageId = typeof userMsg === "object" ? userMsg.messageId : null;
+        const processedMessageIds = new Set();
+
+        if (messageId) {
+            processedMessageIds.add(messageId);
+            if (this.bot) {
+                await this.bot.setReaction(chatId, messageId, "👀");
+            }
+        }
 
         // 이미 에이전트가 실행 중이면 큐에 추가
         if (this.running.get(chatId)) {
@@ -96,17 +105,24 @@ class Agent {
             }
             this.pendingMessages.get(chatId).push(typeof userMsg === "string" ? { type: "text", text: userMsg } : userMsg);
             logger.info(`[${chatId}] 에이전트 실행 중 — 대기 큐에 추가: ${messageText.slice(0, 50)}`);
-            if (this.bot) {
-                await this.bot.setReaction(chatId, userMsg.messageId || 0, "👀");
-            }
             return;
         }
 
         this.running.set(chatId, true);
 
         try {
-            await this._runAgentLoop(chatId, userMsg);
+            const idsFromRun = await this._runAgentLoop(chatId, userMsg);
+            if (Array.isArray(idsFromRun)) {
+                for (const id of idsFromRun) {
+                    if (id) processedMessageIds.add(id);
+                }
+            }
         } finally {
+            if (this.bot) {
+                for (const id of processedMessageIds) {
+                    await this.bot.clearReaction(chatId, id);
+                }
+            }
             this.running.set(chatId, false);
 
             // 대기 큐에 남은 메시지가 있으면 다시 실행
@@ -145,6 +161,11 @@ class Agent {
         const tools = this.moduleLoader.getToolSchemas();
         const maxIterations = config.agent.maxIterations;
         let iteration = 0;
+        const processedMessageIds = new Set();
+        const workingReactionMessageIds = new Set();
+        if (typeof userMsg === "object" && userMsg.messageId) {
+            processedMessageIds.add(userMsg.messageId);
+        }
 
         // 도구 사용 기록
         const toolHistory = [];
@@ -163,6 +184,12 @@ class Agent {
             iteration++;
             logger.info(`에이전트 루프 ${iteration}/${maxIterations}`);
 
+            // 이번 모델 호출 전에 도착한 메시지를 우선 컨텍스트에 반영
+            const preDrained = this._drainPendingMessages(chatId, messages);
+            for (const msg of preDrained) {
+                if (msg?.messageId) processedMessageIds.add(msg.messageId);
+            }
+
             // 컨텍스트 압축 체크
             if (needsCompression(messages)) {
                 logger.info("컨텍스트 압축 시작...");
@@ -179,6 +206,15 @@ class Agent {
             if (this.bot) await this.bot.sendTyping(chatId);
 
             try {
+                if (this.bot) {
+                    for (const id of processedMessageIds) {
+                        if (!workingReactionMessageIds.has(id)) {
+                            await this.bot.setWorkingReaction(chatId, id);
+                            workingReactionMessageIds.add(id);
+                        }
+                    }
+                }
+
                 // 스트리밍 콜백 설정
                 const onDelta = (text) => {
                     if (this.bot && streamMsgId) {
@@ -205,6 +241,19 @@ class Agent {
                         await this.bot.updateStream(chatId, streamMsgId, `🔧 도구 사용 중: ${toolNames}`);
                     }
 
+                    let interruptedByPending = false;
+                    const flushPendingAfterTool = () => {
+                        const drainedMessages = this._drainPendingMessages(chatId, messages);
+                        for (const msg of drainedMessages) {
+                            if (msg?.messageId) processedMessageIds.add(msg.messageId);
+                        }
+                        const drained = drainedMessages.length > 0;
+                        if (drained) {
+                            logger.info(`[${chatId}] 새 대기 메시지 우선 처리 — 남은 도구 호출 보류`);
+                        }
+                        return drained;
+                    };
+
                     for (const toolCall of response.toolCalls) {
                         logger.info(`도구 호출: ${toolCall.name}`);
 
@@ -222,6 +271,10 @@ class Agent {
                             const errMsg = `도구 인자 파싱 실패: ${toolCall.arguments}`;
                             messages.push({ role: "tool", call_id: toolCall.call_id, content: errMsg });
                             toolHistory.push({ name: toolCall.name, args: toolCall.arguments, result: errMsg });
+                            if (flushPendingAfterTool()) {
+                                interruptedByPending = true;
+                                break;
+                            }
                             continue;
                         }
 
@@ -234,6 +287,10 @@ class Agent {
                                 const denyMsg = "사용자가 실행을 거부했습니다.";
                                 messages.push({ role: "tool", call_id: toolCall.call_id, content: denyMsg });
                                 toolHistory.push({ name: toolCall.name, args, result: denyMsg });
+                                if (flushPendingAfterTool()) {
+                                    interruptedByPending = true;
+                                    break;
+                                }
                                 continue;
                             }
                         }
@@ -265,10 +322,20 @@ class Agent {
                             messages.push({ role: "tool", call_id: toolCall.call_id, content: errStr });
                             toolHistory.push({ name: toolCall.name, args, result: errStr });
                         }
+
+                        if (flushPendingAfterTool()) {
+                            interruptedByPending = true;
+                            break;
+                        }
                     }
 
-                    // 도구 실행 후, 대기 메시지를 컨텍스트에 반영
-                    this._drainPendingMessages(chatId, messages);
+                    // 중단되지 않았다면 마지막으로 한 번 더 대기 메시지 반영
+                    if (!interruptedByPending) {
+                        const drainedMessages = this._drainPendingMessages(chatId, messages);
+                        for (const msg of drainedMessages) {
+                            if (msg?.messageId) processedMessageIds.add(msg.messageId);
+                        }
+                    }
 
                     continue; // 다음 루프
                 }
@@ -334,6 +401,8 @@ class Agent {
                 await this.bot.send(chatId, "⚠️ 최대 작업 반복에 도달했습니다.");
             }
         }
+
+        return Array.from(processedMessageIds);
     }
 }
 

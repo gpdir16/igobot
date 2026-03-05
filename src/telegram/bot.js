@@ -324,12 +324,32 @@ class TelegramBot {
     }
 
     async setReaction(chatId, messageId, emoji = "👍") {
-        if (!this.bot) return;
+        if (!this.bot || !messageId) return false;
         try {
             await this.bot.telegram.callApi("setMessageReaction", {
                 chat_id: chatId,
                 message_id: messageId,
                 reaction: [{ type: "emoji", emoji }],
+            });
+            return true;
+        } catch (err) {
+            logger.debug(`setReaction 실패 (${emoji}): ${err.message}`);
+            return false;
+        }
+    }
+
+    async setWorkingReaction(chatId, messageId) {
+        const ok = await this.setReaction(chatId, messageId, "⚡");
+        return ok ? "⚡" : null;
+    }
+
+    async clearReaction(chatId, messageId) {
+        if (!this.bot || !messageId) return;
+        try {
+            await this.bot.telegram.callApi("setMessageReaction", {
+                chat_id: chatId,
+                message_id: messageId,
+                reaction: [],
             });
         } catch {}
     }
