@@ -1,5 +1,5 @@
 {
-    "model": "gpt-5.2",
-    "contextWindow": 400000,
+    "model": "gpt-5.4",
+    "contextWindow": 1050000,
     "reasoningEffort": "medium"
 }
