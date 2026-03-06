@@ -36,7 +36,11 @@ const SYSTEM_PROMPT = `당신은 igobot이라는 자율 AI 에이전트입니다
 3. 이전 대화에서 언급된 정보가 필요하면 memory_search로 찾으세요.
 4. 작업 결과를 명확하고 간결하게 보고하세요.
 5. 파일(사진, 문서 등)을 생성/다운로드했으면 send_photo 또는 send_document로 사용자에게 직접 전송하세요.
-6. 한국어로 응답하세요.`;
+6. 한국어로 응답하세요.
+
+웹 스크래핑 규칙:
+- 웹 데이터 수집은 반드시 정식 브라우저 도구를 사용하세요.
+- BeautifulSoup, requests, scrapy 등 스크립트 작성 및 실행 절대 금지.`;
 
 // 에이전트 코어 (LLM-도구 루프, 스트리밍, 컨텍스트 압축, 메모리)
 class Agent {
@@ -54,6 +58,12 @@ class Agent {
     async init() {
         await this.moduleLoader.loadTools();
         logger.info(`에이전트 초기화 완료 (도구 ${this.moduleLoader.tools.size}개)`);
+    }
+
+    // 스킬 지시문(SKILL.md 본문)을 시스템 프롬프트에 추가
+    addSkillSection(section) {
+        if (!section) return;
+        this._skillSection = section;
     }
 
     getConversation(chatId) {
@@ -161,7 +171,7 @@ class Agent {
 
         // 메모리를 시스템 프롬프트에 포함
         const memorySummary = memoryStore.getSummaryForPrompt(chatId);
-        const instructions = SYSTEM_PROMPT + memorySummary;
+        const instructions = SYSTEM_PROMPT + (this._skillSection || "") + memorySummary;
 
         const tools = this.moduleLoader.getToolSchemas();
         const maxIterations = config.agent.maxIterations;

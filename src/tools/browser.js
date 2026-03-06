@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import logger from "../utils/logger.js";
 
 let _playwright = null;
@@ -6,21 +7,32 @@ let _browser = null;
 // 세션 맵: sessionId -> { context, page }
 const _sessions = new Map();
 
+// Firefox가 설치되어 있지 않으면 자동 설치
+async function ensureFirefoxInstalled() {
+    try {
+        const pw = await import("playwright");
+        _playwright = pw.default || pw;
+        // 설치 여부 확인: executablePath()가 존재하면 OK
+        _playwright.firefox.executablePath();
+    } catch {
+        logger.info("Firefox(Playwright) 미설치 — 자동 설치 중...");
+        execSync("npx playwright install firefox", { stdio: "inherit" });
+        logger.info("Firefox 설치 완료");
+        // 재로드
+        const pw = await import("playwright");
+        _playwright = pw.default || pw;
+    }
+}
+
 // Playwright 브라우저 인스턴스를 가져오기 (lazy 로딩)
 async function getBrowser() {
     if (_browser?.isConnected()) return _browser;
 
-    if (!_playwright) {
-        const pw = await import("playwright");
-        _playwright = pw.default || pw;
-    }
+    await ensureFirefoxInstalled();
 
-    _browser = await _playwright.firefox.launch({
-        headless: false,
-        args: ["--no-remote"],
-    });
+    _browser = await _playwright.firefox.launch();
 
-    logger.info("Firefox 브라우저 시작됨 (headful)");
+    logger.info("Firefox 브라우저 시작됨");
     return _browser;
 }
 

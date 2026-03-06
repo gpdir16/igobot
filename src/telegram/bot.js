@@ -13,6 +13,8 @@ class TelegramBot {
         this.yoloRuns = new Set();
         this.onMessage = null;
         this.onReset = null;
+        // 스킬에서 등록된 슬래시 명령어 핸들러 (bot.launch() 전에 등록)
+        this._skillCommands = [];
     }
 
     async start(messageHandler) {
@@ -42,13 +44,17 @@ class TelegramBot {
         });
 
         this.bot.start((ctx) => {
+            const skillCmds = this._skillCommands
+                .map((c) => `/${c.command} — ${c.description || c.command}`)
+                .join("\n");
             ctx.replyWithHTML(
                 "<b>🤖 igobot</b> 활성화됨\n\n" +
                     "메시지를 보내면 AI 에이전트가 응답합니다.\n" +
                     "쓰기/실행 작업은 승인을 요청합니다.\n\n" +
-                    "<b>명령어:</b>\n" +
+                    "<b>기본 명령어:</b>\n" +
                     "/reset — 대화 초기화\n" +
-                    "/status — 상태 확인",
+                    "/status — 상태 확인" +
+                    (skillCmds ? "\n\n<b>스킬 명령어:</b>\n" + skillCmds : ""),
             );
         });
 
@@ -60,6 +66,12 @@ class TelegramBot {
         this.bot.command("status", (ctx) => {
             ctx.reply("✅ 에이전트 작동 중");
         });
+
+        // 스킬 명령어 등록
+        for (const { command, handler } of this._skillCommands) {
+            this.bot.command(command, handler);
+            logger.info(`스킬 명령어 등록: /${command}`);
+        }
 
         // ===== 승인 콜백 =====
         this.bot.action(/^approve:(.+)$/, async (ctx) => {
@@ -431,6 +443,15 @@ class TelegramBot {
         }
 
         return lastMsgId;
+    }
+
+    // ==================== 스킬 명령어 등록 ====================
+
+    // SkillLoader에서 반환한 명령어 핸들러 목록을 등록 (bot.start() 호출 전에 사용)
+    registerSkillCommands(handlers) {
+        for (const handler of handlers) {
+            this._skillCommands.push(handler);
+        }
     }
 
     // ==================== 스트리밍 (공식 sendMessageDraft API) ====================
