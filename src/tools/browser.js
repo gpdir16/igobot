@@ -37,7 +37,6 @@ async function getSession(sessionId = "default") {
 
     const browser = await getBrowser();
     const context = await browser.newContext({
-        // 기본 뷰포트 설정
         viewport: { width: 1280, height: 800 },
     });
     const page = await context.newPage();
@@ -45,18 +44,6 @@ async function getSession(sessionId = "default") {
     _sessions.set(sessionId, session);
     logger.info(`새 브라우저 세션 생성: ${sessionId}`);
     return session;
-}
-
-// 특정 세션 종료 (쿠키 포함 완전 삭제)
-async function closeSession(sessionId = "default") {
-    if (_sessions.has(sessionId)) {
-        const { context } = _sessions.get(sessionId);
-        await context.close();
-        _sessions.delete(sessionId);
-        logger.info(`브라우저 세션 종료: ${sessionId}`);
-        return true;
-    }
-    return false;
 }
 
 // 모든 세션 및 브라우저 정리
@@ -101,12 +88,10 @@ export const browseFetch = {
             if (waitFor) {
                 await page.waitForSelector(waitFor, { timeout: timeout / 2 });
             }
-            // 약간의 추가 대기 (동적 렌더링)
             await page.waitForTimeout(1000);
 
             const title = await page.title();
             const text = await page.evaluate(() => {
-                // 불필요한 요소 제거
                 document.querySelectorAll("script, style, nav, footer, header, iframe, noscript").forEach((el) => el.remove());
                 return document.body?.innerText || "";
             });
@@ -119,47 +104,6 @@ export const browseFetch = {
         } catch (err) {
             return `페이지 로드 실패: ${err.message}`;
         }
-        // page.close() 없음 → 세션(쿠키 등) 유지
-    },
-};
-
-// 브라우저 도구: 스크린샷 촬영
-export const browserScreenshot = {
-    name: "browser_screenshot",
-    description: "웹페이지의 스크린샷을 촬영합니다. 촬영 후 자동으로 사용자에게 텔레그램 사진으로 전송됩니다.",
-    requiresApproval: false,
-    schema: {
-        type: "object",
-        properties: {
-            url: { type: "string", description: "접속할 URL" },
-            caption: { type: "string", description: "사진 설명 (선택)" },
-            fullPage: { type: "boolean", description: "전체 페이지 캡처 여부 (선택, 기본값: false)" },
-            sessionId: { type: "string", description: "세션 ID (선택, 기본값: 'default')" },
-        },
-        required: ["url"],
-    },
-    async execute(args) {
-        const { url, caption = "", fullPage = false, sessionId = "default" } = args;
-        const { page } = await getSession(sessionId);
-
-        // 저장 경로 자동 생성 (data/workspace/screenshots/)
-        const { mkdirSync, existsSync } = await import("node:fs");
-        const { resolve } = await import("node:path");
-        const dir = resolve(process.cwd(), "data", "workspace", "screenshots");
-        if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-        const filename = `screenshot_${Date.now()}.png`;
-        const savePath = resolve(dir, filename);
-
-        try {
-            await page.goto(url, { waitUntil: "domcontentloaded", timeout: 15000 });
-            await page.waitForTimeout(2000);
-            await page.screenshot({ path: savePath, fullPage });
-            // 특수 객체 반환 → agent.js가 bot.sendPhoto로 자동 전송
-            return { __type: "photo", path: savePath, caption: caption || `${url} 스크린샷` };
-        } catch (err) {
-            return `스크린샷 실패: ${err.message}`;
-        }
-        // page.close() 없음 → 세션 유지
     },
 };
 
@@ -225,7 +169,6 @@ export const browserInteract = {
                 }
             }
 
-            // 최종 페이지 텍스트
             const finalText = await page.evaluate(() => document.body?.innerText?.slice(0, 3000) || "");
             results.push(`\n최종 페이지 내용:\n${finalText}`);
 
@@ -233,66 +176,9 @@ export const browserInteract = {
         } catch (err) {
             return `인터랙션 실패: ${err.message}\n수행된 액션:\n${results.join("\n")}`;
         }
-        // page.close() 없음 → 세션 유지
     },
 };
 
-// 브라우저 도구: 세션 관리
-export const browserSession = {
-    name: "browser_session",
-    description: "브라우저 세션을 관리합니다. 세션 목록 조회, 쿠키 확인, 세션 종료 등.",
-    requiresApproval: false,
-    schema: {
-        type: "object",
-        properties: {
-            action: {
-                type: "string",
-                enum: ["list", "close", "cookies", "clear_cookies"],
-                description: "수행할 작업: list(세션 목록), close(세션 종료), cookies(쿠키 조회), clear_cookies(쿠키 삭제)",
-            },
-            sessionId: { type: "string", description: "대상 세션 ID (list 제외 필수)" },
-        },
-        required: ["action"],
-    },
-    async execute(args) {
-        const { action, sessionId = "default" } = args;
-
-        switch (action) {
-            case "list": {
-                if (_sessions.size === 0) return "활성 세션 없음";
-                const list = [..._sessions.keys()].map((id) => {
-                    const { page } = _sessions.get(id);
-                    return `- ${id}: ${page.isClosed() ? "페이지 닫힘" : page.url()}`;
-                });
-                return `활성 세션 (${_sessions.size}개):\n${list.join("\n")}`;
-            }
-            case "close": {
-                const closed = await closeSession(sessionId);
-                return closed ? `세션 '${sessionId}' 종료됨` : `세션 '${sessionId}' 없음`;
-            }
-            case "cookies": {
-                if (!_sessions.has(sessionId)) return `세션 '${sessionId}' 없음`;
-                const { context } = _sessions.get(sessionId);
-                const cookies = await context.cookies();
-                if (cookies.length === 0) return `세션 '${sessionId}': 쿠키 없음`;
-                return (
-                    `세션 '${sessionId}' 쿠키 (${cookies.length}개):\n` +
-                    cookies.map((c) => `  ${c.name}=${c.value.slice(0, 30)}... (${c.domain})`).join("\n")
-                );
-            }
-            case "clear_cookies": {
-                if (!_sessions.has(sessionId)) return `세션 '${sessionId}' 없음`;
-                const { context } = _sessions.get(sessionId);
-                await context.clearCookies();
-                return `세션 '${sessionId}' 쿠키 삭제됨`;
-            }
-            default:
-                return `알 수 없는 action: ${action}`;
-        }
-    },
-};
-
-// 브라우저 정리 함수 export
 export { closeBrowser };
 
-export default [browseFetch, browserScreenshot, browserInteract, browserSession];
+export default [browseFetch, browserInteract];

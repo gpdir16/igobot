@@ -12,8 +12,8 @@ const SYSTEM_PROMPT = `당신은 igobot이라는 자율 AI 에이전트입니다
 - 이것은 서버에서 실행되는 에이전트입니다. GUI나 화면이 없습니다.
 - 사용자에게 보여줄 모든 내용은 반드시 텔레그램 메시지로 전송해야 합니다.
 - 코드 실행 결과, 파일 내용 등도 사용자에게 텍스트로 전달하세요.
-- 스크린샷은 browser_screenshot 도구 호출 시 자동으로 사용자에게 전송됩니다. 별도로 전송할 필요 없습니다.
 - **파일 작업(write_file, delete_file)은 data/workspace/ 디렉토리 내에서만 가능합니다.** 이 경로를 기준으로 상대 경로를 사용하세요.
+- 사용자가 이미지를 보내면 직접 볼 수 있습니다. 이미지 분석이 가능합니다.
 
 사용 가능한 도구:
 - run_terminal: 터미널에서 셸 명령 실행
@@ -23,10 +23,9 @@ const SYSTEM_PROMPT = `당신은 igobot이라는 자율 AI 에이전트입니다
 - write_file: 파일 생성/수정 (data/workspace/ 기준)
 - delete_file: 파일 삭제 (data/workspace/ 기준)
 - browser_fetch: 웹페이지 내용 가져오기
-- browser_screenshot: 웹페이지 스크린샷 (자동 사용자 전송)
 - browser_interact: 웹페이지 인터랙션
-- send_photo: 로컬 파일을 사용자에게 사진으로 전송
-- send_document: 로컬 파일을 사용자에게 문서로 전송
+- send_photo: 로컬 파일 또는 URL을 사용자에게 사진으로 전송
+- send_document: 로컬 파일 또는 URL을 사용자에게 문서로 전송
 - memory_save: 중요 정보를 영구 메모리에 저장
 - memory_search: 저장된 메모리 검색
 - memory_delete: 저장된 메모리 삭제
@@ -36,7 +35,7 @@ const SYSTEM_PROMPT = `당신은 igobot이라는 자율 AI 에이전트입니다
 2. 중요한 정보(사용자 선호, 프로젝트 정보, 기억해야 할 사항)는 memory_save로 저장하세요.
 3. 이전 대화에서 언급된 정보가 필요하면 memory_search로 찾으세요.
 4. 작업 결과를 명확하고 간결하게 보고하세요.
-5. 파일(사진, 문서 등)을 생성/다운로드했으면 사용자에게 텔레그램으로 전송까지 완료하세요.
+5. 파일(사진, 문서 등)을 생성/다운로드했으면 send_photo 또는 send_document로 사용자에게 직접 전송하세요.
 6. 한국어로 응답하세요.`;
 
 // 에이전트 코어 (LLM-도구 루프, 스트리밍, 컨텍스트 압축, 메모리)
@@ -142,14 +141,20 @@ class Agent {
         const messages = this.getConversation(chatId);
         const messageText = typeof userMsg === "string" ? userMsg : userMsg.text || `[${userMsg.type}]`;
 
-        // 사진 메시지의 경우 URL 포함
-        let userContent = messageText;
+        // 사진 메시지는 vision 배열 content로, 문서/음성은 텍스트로
+        let userContent;
         if (userMsg.type === "photo" && userMsg.photoUrl) {
-            userContent = `[사진 업로드됨: ${userMsg.photoUrl}]\n${messageText}`;
+            // LLM이 이미지를 직접 볼 수 있도록 input_image 타입 포함
+            userContent = [
+                { type: "input_image", image_url: userMsg.photoUrl },
+                { type: "input_text", text: messageText || "이 이미지를 분석해주세요." },
+            ];
         } else if (userMsg.type === "document" && userMsg.fileUrl) {
             userContent = `[문서 업로드됨: ${userMsg.fileName} — ${userMsg.fileUrl}]\n${messageText}`;
         } else if (userMsg.type === "voice") {
             userContent = `[음성 메시지: ${userMsg.fileUrl || ""}]\n${messageText}`;
+        } else {
+            userContent = messageText;
         }
 
         messages.push({ role: "user", content: userContent });
@@ -316,21 +321,7 @@ class Agent {
                         // 도구 실행
                         try {
                             const result = await this.moduleLoader.executeTool(toolCall.name, args, { chatId, bot: this.bot });
-
-                            // 사진 자동 전송 (browser_screenshot 등)
-                            let resultStr;
-                            if (result && typeof result === "object" && result.__type === "photo") {
-                                if (this.bot) {
-                                    try {
-                                        await this.bot.sendPhoto(chatId, result.path, result.caption || "");
-                                    } catch (photoErr) {
-                                        logger.error("사진 자동 전송 실패:", photoErr);
-                                    }
-                                }
-                                resultStr = `스크린샷이 사용자에게 전송되었습니다. (경로: ${result.path})`;
-                            } else {
-                                resultStr = typeof result === "string" ? result : JSON.stringify(result);
-                            }
+                            const resultStr = typeof result === "string" ? result : JSON.stringify(result);
 
                             messages.push({ role: "tool", call_id: toolCall.call_id, content: resultStr });
                             toolHistory.push({ name: toolCall.name, args, result: resultStr });
@@ -363,9 +354,27 @@ class Agent {
                     messages.push({ role: "assistant", content: response.text });
 
                     if (this.bot && streamMsgId) {
-                        // 도구 기록이 있으면 버튼 포함, 없으면 일반
-                        await this.bot.finishStream(chatId, streamMsgId, response.text, toolHistory.length > 0 ? toolHistory : null);
-                        streamMsgId = null;
+                        // 대기 중인 메시지가 있으면 현재 응답을 표시하지 않고
+                        // 에이전트 컨텍스트에만 미표시 사실을 기록
+                        const pendingQueue = this.pendingMessages.get(chatId);
+                        if (pendingQueue && pendingQueue.length > 0) {
+                            try {
+                                await this.bot.bot.telegram.callApi("sendMessageDraft", {
+                                    chat_id: chatId,
+                                    draft_id: streamMsgId,
+                                    text: " ",
+                                });
+                            } catch {}
+                            streamMsgId = null;
+                            // LLM이 다음 턴에 상황을 인지하도록 컨텍스트에 주입
+                            messages.push({
+                                role: "user",
+                                content: "[시스템: 위 응답은 새 메시지 도착으로 인해 사용자에게 표시되지 않았습니다. 이어지는 메시지를 처리하세요.]",
+                            });
+                        } else {
+                            await this.bot.finishStream(chatId, streamMsgId, response.text, toolHistory.length > 0 ? toolHistory : null);
+                            streamMsgId = null;
+                        }
                     }
                 } else if (this.bot && streamMsgId) {
                     // 빈 응답 — 드래프트 제거

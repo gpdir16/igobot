@@ -1,5 +1,6 @@
 import { Telegraf, Markup } from "telegraf";
-import { createReadStream, existsSync } from "node:fs";
+import { createReadStream, existsSync, writeFileSync, mkdirSync } from "node:fs";
+import { resolve } from "node:path";
 import config from "../core/config.js";
 import logger from "../utils/logger.js";
 import { markdownToTelegramHtml, escapeHtml, splitAndConvert } from "../utils/markdown.js";
@@ -9,8 +10,6 @@ class TelegramBot {
     constructor() {
         this.bot = null;
         this._pendingApprovals = new Map();
-        this._toolLogs = new Map();
-        this._toolLogMsgIds = new Map();
         this.yoloRuns = new Set();
         this.onMessage = null;
         this.onReset = null;
@@ -102,55 +101,6 @@ class TelegramBot {
                     await ctx.deleteMessage();
                 } catch {}
             }
-        });
-
-        // ===== 도구 기록 버튼 콜백 =====
-        this.bot.action(/^toollog:(.+)$/, async (ctx) => {
-            await ctx.answerCbQuery();
-            const id = ctx.match[1];
-            const logChunks = this._toolLogs.get(id);
-            if (!logChunks || logChunks.length === 0) return;
-            const sentIds = [];
-            try {
-                for (let i = 0; i < logChunks.length; i++) {
-                    const isLast = i === logChunks.length - 1;
-                    const header = i === 0 ? `<b>🔧 도구 사용 기록</b>\n\n` : "";
-                    const sent = await ctx.telegram.sendMessage(ctx.chat.id, header + logChunks[i], {
-                        parse_mode: "HTML",
-                        ...(isLast
-                            ? {
-                                  reply_markup: Markup.inlineKeyboard([Markup.button.callback("🗑 닫기", `closelog:${id}`)]).reply_markup,
-                              }
-                            : {}),
-                    });
-                    sentIds.push(sent.message_id);
-                }
-                this._toolLogMsgIds.set(id, sentIds);
-            } catch (err) {
-                logger.error("toollog 전송 실패:", err);
-                try {
-                    await ctx.telegram.sendMessage(ctx.chat.id, `⚠️ 기록 표시 실패: ${err.message}`);
-                } catch {}
-            }
-        });
-
-        this.bot.action(/^closelog:(.+)$/, async (ctx) => {
-            const id = ctx.match[1];
-            await ctx.answerCbQuery();
-            const msgIds = this._toolLogMsgIds.get(id);
-            if (msgIds && msgIds.length > 0) {
-                for (const msgId of msgIds) {
-                    try {
-                        await ctx.telegram.deleteMessage(ctx.chat.id, msgId);
-                    } catch {}
-                }
-            } else {
-                try {
-                    await ctx.deleteMessage();
-                } catch {}
-            }
-            this._toolLogs.delete(id);
-            this._toolLogMsgIds.delete(id);
         });
 
         // ===== 메시지 수신 (모든 타입) — fire-and-forget =====
@@ -449,52 +399,37 @@ class TelegramBot {
 
     async sendWithToolLog(chatId, text, toolHistory) {
         if (!this.bot) return;
-        const logId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-        // 엔트리마다 완결한 HTML 조각 생성 (태그가 항상 닫힘을 보장)
-        const entries = [];
-        for (const entry of toolHistory) {
-            let fragment = `<b>📌 ${escapeHtml(entry.name)}</b>\n`;
-            if (entry.args) {
-                const s = typeof entry.args === "string" ? entry.args : JSON.stringify(entry.args, null, 2);
-                fragment += `<pre>${escapeHtml(s.slice(0, 250))}</pre>\n`;
+        // 1. 본문 전송
+        const lastMsgId = await this.send(chatId, text);
+
+        // 2. 도구 기록을 txt 파일로 저장 후 첨부 전송
+        try {
+            const lines = ["도구 사용 기록", "=".repeat(50), ""];
+            for (const entry of toolHistory) {
+                lines.push(`[${entry.name}]`);
+                if (entry.args) {
+                    const s = typeof entry.args === "string" ? entry.args : JSON.stringify(entry.args, null, 2);
+                    lines.push(`인자:\n${s}`);
+                }
+                if (entry.result) {
+                    lines.push(`결과:\n${entry.result}`);
+                }
+                lines.push("");
             }
-            if (entry.result) {
-                fragment += `➜ <code>${escapeHtml(entry.result.slice(0, 200))}</code>\n\n`;
-            }
-            entries.push(fragment);
+            const content = lines.join("\n");
+
+            const dir = resolve(process.cwd(), "data", "workspace");
+            if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+            const filename = `toollog_${Date.now()}.txt`;
+            const filePath = resolve(dir, filename);
+            writeFileSync(filePath, content, "utf-8");
+
+            await this.sendDocument(chatId, filePath, filename, "🔧 도구 사용 기록");
+        } catch (err) {
+            logger.error("도구 기록 파일 전송 실패:", err);
         }
 
-        // 엔트리 경계에서만 자르기 (태그 잔림 없음)
-        const logChunks = [];
-        let logCur = "";
-        for (const item of entries) {
-            if (logCur.length + item.length > 3800) {
-                if (logCur) logChunks.push(logCur);
-                logCur = item.length > 3800 ? item.slice(0, 3800) : item;
-            } else {
-                logCur += item;
-            }
-        }
-        if (logCur) logChunks.push(logCur);
-        this._toolLogs.set(logId, logChunks); // 배열로 저장
-
-        // 본문 전송
-        const textChunks = splitAndConvert(text, 3000);
-        if (textChunks.length === 0) textChunks.push("");
-        let lastMsgId;
-        for (let i = 0; i < textChunks.length; i++) {
-            const isLast = i === textChunks.length - 1;
-            const msg = await this.bot.telegram.sendMessage(chatId, textChunks[i] || "(응답 없음)", {
-                parse_mode: "HTML",
-                ...(isLast
-                    ? {
-                          reply_markup: Markup.inlineKeyboard([Markup.button.callback("📋 도구 사용 기록", `toollog:${logId}`)]).reply_markup,
-                      }
-                    : {}),
-            });
-            lastMsgId = msg.message_id;
-        }
         return lastMsgId;
     }
 

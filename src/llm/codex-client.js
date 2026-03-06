@@ -28,10 +28,14 @@ class CodexClient {
     _convertMessages(messages) {
         return messages.map((msg) => {
             if (msg.role === "user") {
+                // content가 배열이면 그대로 사용 (vision 입력 포함 가능)
+                const content = Array.isArray(msg.content)
+                    ? msg.content
+                    : [{ type: "input_text", text: msg.content }];
                 return {
                     type: "message",
                     role: "user",
-                    content: [{ type: "input_text", text: msg.content }],
+                    content,
                 };
             }
             if (msg.role === "assistant") {
