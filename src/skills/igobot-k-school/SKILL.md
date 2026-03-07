@@ -68,8 +68,10 @@ https://www.schoolinfo.go.kr/ei/ss/Pneiss_a01_s0.do
 `browser_interact`로 컴시간 사이트에 접속한다:
 
 ```
-http://컴시간학생.kr/ (구시대적 웹사이트라 https를 지원하지 않음)
+http://컴시간학생.kr/
 ```
+
+comci.net은 기존 웹사이트며 현재는 사용이 불가능함.
 
 학교명으로 검색한다.
 
