@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import logger from "../utils/logger.js";
 
 let _playwright = null;
@@ -9,18 +10,24 @@ const _sessions = new Map();
 
 // Firefox가 설치되어 있지 않으면 자동 설치
 async function ensureFirefoxInstalled() {
+    const pw = await import("playwright");
+    _playwright = pw.default || pw;
+
+    // 실제 파일 존재 여부 확인
+    const firefoxPath = _playwright.firefox.executablePath();
+    if (existsSync(firefoxPath)) {
+        logger.debug(`Firefox 이미 설치됨: ${firefoxPath}`);
+        return;
+    }
+
+    // 파일이 없으면 설치
+    logger.info("Firefox(Playwright) 미설치 — 자동 설치 중...");
     try {
-        const pw = await import("playwright");
-        _playwright = pw.default || pw;
-        // 설치 여부 확인: executablePath()가 존재하면 OK
-        _playwright.firefox.executablePath();
-    } catch {
-        logger.info("Firefox(Playwright) 미설치 — 자동 설치 중...");
         execSync("npx playwright install firefox", { stdio: "inherit" });
         logger.info("Firefox 설치 완료");
-        // 재로드
-        const pw = await import("playwright");
-        _playwright = pw.default || pw;
+    } catch (err) {
+        logger.error("Firefox 설치 실패:", err.message);
+        throw new Error("Playwright Firefox를 설치할 수 없습니다. 'npx playwright install firefox'를 수동으로 실행해주세요.");
     }
 }
 
