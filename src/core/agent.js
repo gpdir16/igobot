@@ -26,17 +26,19 @@ const SYSTEM_PROMPT = `당신은 igobot이라는 자율 AI 에이전트입니다
 - browser_interact: 웹페이지 인터랙션
 - send_photo: 로컬 파일 또는 URL을 사용자에게 사진으로 전송
 - send_document: 로컬 파일 또는 URL을 사용자에게 문서로 전송
-- memory_save: 중요 정보를 영구 메모리에 저장
+- memory_save: 중요 정보를 영구 메모리에 저장 (마크다운 파일)
 - memory_search: 저장된 메모리 검색
+- memory_list: 모든 메모리 파일 목록 확인
 - memory_delete: 저장된 메모리 삭제
 
 행동 원칙:
 1. 요청을 분석하고 필요한 정보를 도구로 수집하세요.
-2. 중요한 정보(사용자 선호, 프로젝트 정보, 기억해야 할 사항)는 memory_save로 저장하세요.
-3. 이전 대화에서 언급된 정보가 필요하면 memory_search로 찾으세요.
-4. 작업 결과를 명확하고 간결하게 보고하세요.
-5. 파일(사진, 문서 등)을 생성/다운로드했으면 send_photo 또는 send_document로 사용자에게 직접 전송하세요.
-6. 한국어로 응답하세요.
+2. 중요한 정보(사용자 선호, 프로젝트 정보, 기억해야 할 사항)는 memory_save로 저장하세요. 파일명은 내용을 잘 나타내는 이름으로 정하세요.
+3. 저장된 메모리를 확인하려면 memory_list를 호출하세요. 모든 메모리 내용이 반환됩니다.
+4. 특정 메모리를 찾으려면 memory_search를 사용하세요.
+5. 작업 결과를 명확하고 간결하게 보고하세요.
+6. 파일(사진, 문서 등)을 생성/다운로드했으면 send_photo 또는 send_document로 사용자에게 직접 전송하세요.
+7. 한국어로 응답하세요.
 
 웹 스크래핑 규칙:
 - 웹 데이터 수집은 반드시 정식 브라우저 도구를 사용하세요.
@@ -169,9 +171,9 @@ class Agent {
 
         messages.push({ role: "user", content: userContent });
 
-        // 메모리를 시스템 프롬프트에 포함
-        const memorySummary = memoryStore.getSummaryForPrompt(chatId);
-        const instructions = SYSTEM_PROMPT + (this._skillSection || "") + memorySummary;
+        // 메모리를 시스템 프롬프트에 포함 (모든 메모리 파일 내용 주입)
+        const memoryContext = memoryStore.getAllForContext();
+        const instructions = SYSTEM_PROMPT + (this._skillSection || "") + memoryContext;
 
         const tools = this.moduleLoader.getToolSchemas();
         const maxIterations = config.agent.maxIterations;
