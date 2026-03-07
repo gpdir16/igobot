@@ -266,14 +266,7 @@ class Agent {
 
                 // 도구 호출
                 if (response.toolCalls.length > 0) {
-                    // 도구 호출이 있으면 메시지 컨텍스트가 바뀌므로 이전 토큰값 무효화
                     lastActualInputTokens = null;
-
-                    // 스트리밍 메시지에 도구 사용 중 표시
-                    if (this.bot && streamMsgId) {
-                        const toolNames = response.toolCalls.map((t) => t.name).join(", ");
-                        await this.bot.updateStream(chatId, streamMsgId, `🔧 도구 사용 중: ${toolNames}`);
-                    }
 
                     let interruptedByPending = false;
                     const flushPendingAfterTool = () => {
