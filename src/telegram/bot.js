@@ -409,13 +409,10 @@ class TelegramBot {
 
     // ==================== 도구 기록 ====================
 
-    async sendWithToolLog(chatId, text, toolHistory) {
-        if (!this.bot) return;
+    // 도구 기록을 파일로만 저장
+    saveToolLogToFile(toolHistory) {
+        if (!toolHistory || toolHistory.length === 0) return null;
 
-        // 1. 본문 전송
-        const lastMsgId = await this.send(chatId, text);
-
-        // 2. 도구 기록을 txt 파일로 저장 후 첨부 전송
         try {
             const lines = ["도구 사용 기록", "=".repeat(50), ""];
             for (const entry of toolHistory) {
@@ -431,18 +428,19 @@ class TelegramBot {
             }
             const content = lines.join("\n");
 
-            const dir = resolve(process.cwd(), "data", "workspace");
+            const dir = resolve(process.cwd(), "data", "workspace", "tool_logs");
             if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-            const filename = `toollog_${Date.now()}.txt`;
+            const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+            const filename = `toollog_${timestamp}.txt`;
             const filePath = resolve(dir, filename);
             writeFileSync(filePath, content, "utf-8");
 
-            await this.sendDocument(chatId, filePath, filename, "🔧 도구 사용 기록");
+            logger.info(`도구 기록 저장: ${filePath}`);
+            return filePath;
         } catch (err) {
-            logger.error("도구 기록 파일 전송 실패:", err);
+            logger.error("도구 기록 파일 저장 실패:", err);
+            return null;
         }
-
-        return lastMsgId;
     }
 
     // ==================== 스킬 명령어 등록 ====================
@@ -502,8 +500,9 @@ class TelegramBot {
             });
         } catch {}
 
+        // 도구 기록이 있으면 파일로만 저장 (전송하지 않음)
         if (toolHistory && toolHistory.length > 0) {
-            return this.sendWithToolLog(chatId, text, toolHistory);
+            this.saveToolLogToFile(toolHistory);
         }
         return this.send(chatId, text);
     }
