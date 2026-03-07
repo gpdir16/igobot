@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { resolve, join } from "node:path";
 import logger from "../utils/logger.js";
 
@@ -11,84 +11,55 @@ function parseFrontmatter(content) {
     const body = match[2].trim();
     const meta = {};
 
-    // 간단한 YAML 파서 (name, description, commands 배열 지원)
-    let currentList = null;
-    let currentItem = null;
-
+    // 간단한 YAML 파서 (name, description 지원)
     for (const line of yamlStr.split("\n")) {
-        // 최상위 키: value
         const topMatch = line.match(/^(\w[\w-]*):\s*(.*)$/);
         if (topMatch && !line.startsWith(" ")) {
-            currentList = null;
-            currentItem = null;
             const key = topMatch[1];
             const val = topMatch[2].trim();
             if (val) {
                 meta[key] = val.replace(/^["']|["']$/g, "");
-            } else {
-                meta[key] = [];
-                currentList = key;
             }
-            continue;
-        }
-
-        // 배열 항목 시작 (  - command: ...)
-        const listItemMatch = line.match(/^  - (\w[\w-]*):\s*(.*)$/);
-        if (listItemMatch && currentList) {
-            currentItem = { [listItemMatch[1]]: listItemMatch[2].replace(/^["']|["']$/g, "") };
-            meta[currentList].push(currentItem);
-            continue;
-        }
-
-        // 배열 항목 내 추가 필드 (    description: ...)
-        const itemFieldMatch = line.match(/^    (\w[\w-]*):\s*(.*)$/);
-        if (itemFieldMatch && currentItem) {
-            currentItem[itemFieldMatch[1]] = itemFieldMatch[2].replace(/^["']|["']$/g, "");
         }
     }
 
     return { meta, body };
 }
 
-// src/skills/ 하위 SKILL.md 파일을 읽어 에이전트 지시문으로 주입하는 로더
+// src/skills/ 하위 폴더를 스캔하여 SKILL.md 파일을 읽어 에이전트 지시문으로 주입하는 로더
 class SkillLoader {
     constructor() {
         this.skills = new Map(); // name → { meta, body, rawContent }
     }
 
-    // src/skills/manifest.json을 기준으로 스킬 로드
+    // src/skills/ 하위 폴더를 스캔하여 SKILL.md 파일 로드
     async loadSkills(skillsDir) {
         const dir = skillsDir || resolve(process.cwd(), "src", "skills");
-        const manifestPath = join(dir, "manifest.json");
 
-        if (!existsSync(manifestPath)) {
-            logger.warn(`스킬 manifest 없음: ${manifestPath}`);
+        if (!existsSync(dir)) {
+            logger.warn(`스킬 디렉토리 없음: ${dir}`);
             return;
         }
 
-        let manifest;
-        try {
-            manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
-        } catch (err) {
-            logger.error("스킬 manifest 파싱 실패:", err);
-            return;
-        }
+        // 하위 폴더 스캔
+        const entries = readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+            if (!entry.isDirectory()) continue;
 
-        for (const entry of manifest.skills || []) {
-            const skillMdPath = join(dir, entry.path, "SKILL.md");
+            const skillMdPath = join(dir, entry.name, "SKILL.md");
             if (!existsSync(skillMdPath)) {
-                logger.warn(`SKILL.md 없음: ${skillMdPath}`);
+                logger.debug(`SKILL.md 없음 (스킵): ${skillMdPath}`);
                 continue;
             }
+
             try {
                 const rawContent = readFileSync(skillMdPath, "utf-8");
                 const { meta, body } = parseFrontmatter(rawContent);
                 const name = meta.name || entry.name;
                 this.skills.set(name, { meta, body, rawContent });
-                const cmdCount = Array.isArray(meta.commands) ? meta.commands.length : 0;
-                logger.info(`스킬 로드 완료: ${name} (명령어 ${cmdCount}개) [${skillMdPath}]`);
+                logger.info(`스킬 로드 완료: ${name} [${skillMdPath}]`);
             } catch (err) {
-                logger.error(`스킬 로드 실패: ${entry.path}`, err);
+                logger.error(`스킬 로드 실패: ${entry.name}`, err);
             }
         }
     }
@@ -102,37 +73,6 @@ class SkillLoader {
             sections.push(`## 스킬: ${name}\n${skill.body}`);
         }
         return `\n\n---\n# 사용 가능한 스킬\n\n${sections.join("\n\n---\n\n")}`;
-    }
-
-    // frontmatter의 commands 배열로 텔레그램 슬래시 명령어 핸들러 생성
-    // 각 명령어는 지정된 message를 에이전트에 그대로 전달
-    getCommandHandlers(onMessage) {
-        const handlers = [];
-        for (const [, skill] of this.skills) {
-            if (!Array.isArray(skill.meta.commands)) continue;
-            for (const cmd of skill.meta.commands) {
-                if (!cmd.command) continue;
-                handlers.push({
-                    command: cmd.command,
-                    description: cmd.description || cmd.command,
-                    handler: (ctx) => {
-                        if (!onMessage) return;
-                        // "/command@botname args" 에서 앞부분 제거하고 인자만 추출
-                        const rawText = ctx.message?.text || "";
-                        const extra = rawText.replace(/^\/\S+\s*/, "").trim();
-                        const baseMessage = cmd.message || `/${cmd.command}`;
-                        const text = extra ? `${baseMessage} (${extra})` : baseMessage;
-                        const msg = {
-                            type: "text",
-                            text,
-                            messageId: ctx.message?.message_id,
-                        };
-                        onMessage(ctx.chat.id, msg).catch(() => {});
-                    },
-                });
-            }
-        }
-        return handlers;
     }
 }
 

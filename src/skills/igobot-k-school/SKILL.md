@@ -1,13 +1,6 @@
 ---
-name: school
-description: 대한민국 학교 급식 및 시간표 조회. 학교알리미(schoolinfo.go.kr)에서 급식을 조회하고, 컴시간알리미(comci.kr)로 시간표를 조회합니다.
-commands:
-  - command: meal
-    description: 오늘(또는 지정 날짜) 학교 급식 조회
-    message: "오늘 학교 급식을 조회해줘"
-  - command: timetable
-    description: 오늘(또는 지정 날짜) 학교 시간표 조회
-    message: "오늘 학교 시간표를 조회해줘"
+name: igobot-k-school
+description: (한국 사용자 전용) 학교알리미와 컴시간을 이용하여 전국 학교 시간표와 급식을 가져옵니다.
 ---
 
 # 학교 급식 및 시간표 조회 스킬

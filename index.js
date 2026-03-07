@@ -25,11 +25,8 @@ async function main() {
     // SKILL.md 본문을 에이전트 시스템 프롬프트에 주입
     agent.addSkillSection(skillLoader.getSystemPromptSection());
 
-    // frontmatter의 commands를 텔레그램 슬래시 명령어로 등록
-    const messageHandler = (chatId, msg) => agent.handleMessage(chatId, msg);
-    bot.registerSkillCommands(skillLoader.getCommandHandlers(messageHandler));
-
     // 메시지 핸들러 등록 및 봇 시작
+    const messageHandler = (chatId, msg) => agent.handleMessage(chatId, msg);
     await bot.start(messageHandler);
 
     logger.info("igobot 준비 완료!");
