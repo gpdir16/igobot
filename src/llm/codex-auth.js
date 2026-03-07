@@ -192,7 +192,7 @@ export async function refreshToken(authData) {
 export async function ensureValidToken() {
     let authData = loadAuth();
     if (!authData?.tokens?.access_token) {
-        throw new Error("인증 정보가 없습니다. `npm run login`으로 로그인하세요.");
+        throw new Error("인증 정보가 없습니다. `igobot login`으로 로그인하세요.");
     }
 
     // access_token JWT exp 확인
@@ -219,7 +219,7 @@ const isMain = process.argv[1]?.endsWith("codex-auth.js");
 if (isMain) {
     login()
         .then(() => {
-            console.log("\n로그인 완료! `npm start`로 봇을 시작하세요.");
+            console.log("\n로그인 완료! `igobot start`로 봇을 시작하세요.");
             process.exit(0);
         })
         .catch((err) => {
