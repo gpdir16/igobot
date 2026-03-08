@@ -103,8 +103,9 @@ async function startBot() {
     }
 
     const mainPath = join(__dirname, "..", "index.js");
-    const out = (await import("fs")).openSync(LOG_FILE, "a");
-    const err = (await import("fs")).openSync(LOG_FILE, "a");
+    const { openSync, closeSync } = await import("fs");
+    const out = openSync(LOG_FILE, "a");
+    const err = openSync(LOG_FILE, "a");
 
     const child = spawn(process.execPath, [mainPath], {
         detached: true,
@@ -113,11 +114,19 @@ async function startBot() {
     });
 
     child.unref();
+    // 부모 프로세스의 fd 복사본을 닫아 이벤트 루프 참조 해제
+    closeSync(out);
+    closeSync(err);
 
     writeFileSync(PID_FILE, child.pid.toString());
 
     console.log(`igobot started (PID: ${child.pid})`);
     console.log(`Log file: ${LOG_FILE}`);
+    // @clack/prompts 등이 TTY를 raw mode로 바꿨을 경우 복원
+    if (process.stdin.isTTY) {
+        try { process.stdin.setRawMode(false); } catch {}
+    }
+    process.stdin.pause();
     process.exit(0);
 }
 

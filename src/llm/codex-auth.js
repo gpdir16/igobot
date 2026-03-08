@@ -126,12 +126,14 @@ export async function login() {
                 res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
                 res.end(t("auth.success_page"));
 
+                clearTimeout(timeoutId);
                 server.close();
                 logger.info(`Login successful (account: ${accountId})`);
                 resolvePromise(authData);
             } catch (err) {
                 res.writeHead(500);
                 res.end("Error");
+                clearTimeout(timeoutId);
                 server.close();
                 reject(err);
             }
@@ -140,15 +142,18 @@ export async function login() {
         server.listen(REDIRECT_PORT, () => {
             logger.info(`OAuth callback server listening: http://localhost:${REDIRECT_PORT}`);
         });
+        // 콜백 대기 중에도 이벤트 루프를 붙잡지 않도록 unref
+        server.unref();
 
-        // 5분 타임아웃
-        setTimeout(
+        // 5분 타임아웃 (unref: 타임아웃만 남아있을 때 프로세스가 자연 종료될 수 있게)
+        const timeoutId = setTimeout(
             () => {
                 server.close();
                 reject(new Error(getT()("auth.login_timeout")));
             },
             5 * 60 * 1000,
         );
+        timeoutId.unref();
     });
 }
 

@@ -84,7 +84,7 @@ export async function runOnboarding({ isFirstRun = false } = {}) {
     }
 
     // ── 언어 선택 (언어 선택 전이므로 영어 표시) ──────────────────────────────
-    intro(" igobot Setup Wizard ");
+    intro("igobot Setup Wizard");
 
     const langValue = await select({
         message: "Select your language",
