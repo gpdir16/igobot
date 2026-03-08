@@ -11,6 +11,7 @@ BIN_DIR="/usr/local/bin"
 NODE_MAJOR=20
 LANG_CODE="en"
 ENV_BACKUP=""
+EXISTING_INSTALL=0
 
 # 색상
 RED=$(tput setaf 1 2>/dev/null || echo "")
@@ -487,22 +488,7 @@ check_npm() {
 # 기존 설치 확인
 check_existing() {
     if [ -d "$INSTALL_DIR" ]; then
-        if show_confirm "$(txt existing): $INSTALL_DIR"; then
-            backup_env_file || show_error "Failed to back up existing .env"
-            rm -rf "$INSTALL_DIR"
-            rm -f "$BIN_DIR/igobot"
-        else
-            show_header
-            echo ""
-            echo "  ${YELLOW}$(txt cancel)${RESET}"
-            echo ""
-            echo ""
-            echo "  ${YELLOW}$(txt continue)${RESET}"
-            show_footer
-            read -rsn1
-            restore_screen
-            exit 0
-        fi
+        EXISTING_INSTALL=1
     fi
 }
 
@@ -510,7 +496,14 @@ check_existing() {
 clone_repo() {
     show_step_progress 4 6 cloning running "$(txt cloning)..."
 
-    if git clone "$REPO_URL" "$INSTALL_DIR"; then
+    if [ "$EXISTING_INSTALL" -eq 1 ]; then
+        if [ -d "$INSTALL_DIR/.git" ] && git -C "$INSTALL_DIR" pull --ff-only; then
+            cd "$INSTALL_DIR"
+            show_step_progress 4 6 cloning done
+        else
+            show_error "Existing installation could not be updated safely. data/ and .env were left untouched."
+        fi
+    elif git clone "$REPO_URL" "$INSTALL_DIR"; then
         cd "$INSTALL_DIR"
         restore_env_file || show_error "Failed to restore existing .env"
         show_step_progress 4 6 cloning done
@@ -579,8 +572,10 @@ show_complete() {
     echo "  ${GREEN}igobot status${RESET}  - Check status"
     echo "  ${GREEN}igobot logs${RESET}    - View logs"
     echo ""
-    echo "${CYAN}▶ $(txt setup_now)${RESET}"
-    echo ""
+    if [ "$EXISTING_INSTALL" -eq 0 ]; then
+        echo "${CYAN}▶ $(txt setup_now)${RESET}"
+        echo ""
+    fi
 }
 
 # 제거
@@ -655,7 +650,9 @@ main() {
     show_complete
 
     # bash → node 로 프로세스 교체 (exec) — node 종료 시 bash 잔존 없이 터미널 즉시 반환
-    exec node "$INSTALL_DIR/bin/igobot.js" setup </dev/tty
+    if [ "$EXISTING_INSTALL" -eq 0 ]; then
+        exec node "$INSTALL_DIR/bin/igobot.js" setup </dev/tty
+    fi
 }
 
 main "$@"
