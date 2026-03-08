@@ -1,127 +1,40 @@
+**English** / [한국어](README.ko.md)
+
 # igobot
 
-Telegram 메신저를 통해 상호작용하는 AI 에이전트입니다. OpenAI의 Codex OAuth 인증을 사용하여 ChatGPT 모델과 통신하며, 다양한 도구를 자율적으로 활용할 수 있습니다.
+An AI agent that interacts via Telegram Messenger. It communicates with the ChatGPT model using OpenAI's Codex OAuth authentication and can autonomously utilize various tools.
 
-> **이 프로젝트는 OpenAI의 공식이 아닙니다.** — Codex OAuth 방식은 OpenAI가 암묵적으로 허용하고 있지만, 언제든 변경될 수 있습니다.
+It's similar to OpenClaw but safer, lighter, and simpler.
 
-## 기능
+> **This project is not official from OpenAI.** — The Codex OAuth method is implicitly allowed by OpenAI, but it could change at any time.
 
-- 🤖 **자율 에이전트** — LLM이 도구를 자율적으로 선택하고 실행
-- 💬 **텔레그램 인터페이스** — 텔레그램 봇을 통한 대화
-- 🔐 **승인 시스템** — 읽기 작업은 자율, 쓰기/실행은 사용자 승인 필요
-- 🧩 **모듈화** — 도구를 자유롭게 추가/수정/제거 가능
+## Key Features
 
-### 내장 도구
+- The agent operates autonomously
+- Asks for permission before performing write operations
+- Supports skills and tools
+- Works in an isolated environment
+- Can control its own Firefox browser
+- Can use many tools including terminal/files/browser
+- And more...
 
-| 도구 | 설명 | 승인 필요 |
-|------|------|-----------|
-| `run_terminal` | 셸 명령 실행 | ✅ |
-| `read_file` | 파일 읽기 | ❌ |
-| `list_directory` | 디렉토리 목록 | ❌ |
-| `search_files` | 텍스트 검색 | ❌ |
-| `write_file` | 파일 작성 (`inWorkspace:true` 기본, `false`면 외부 경로 허용) | ✅ |
-| `delete_file` | 파일 삭제 (`inWorkspace:true` 기본, `false`면 외부 경로 허용) | ✅ |
-| `browser_fetch` | 웹페이지 가져오기 | ❌ |
-| `browser_screenshot` | 스크린샷 | ✅ |
-| `browser_interact` | 웹 인터랙션 | ✅ |
+## Requirements
 
-## 요구사항
+- ChatGPT Plus or Pro subscription
+- Telegram bot token (issued by [BotFather](https://t.me/BotFather))
+- NodeJS 20+ (installed automatically)
+- macOS or Debian, Fedora, Arch
+- GUI desktop environment (for Linux only)
 
-- Node.js 20+
-- ChatGPT Plus 또는 Pro 구독
-- 텔레그램 봇 토큰 ([BotFather](https://t.me/BotFather)에서 발급)
-
-## 설치
+## How to Install
 
 ```bash
-git clone https://github.com/gpdir16/igobot.git
-cd igobot
-npm install
-npx playwright install firefox
+curl -fsSL https://raw.githubusercontent.com/gpdir16/igobot/refs/heads/main/install.sh | bash
 ```
 
-## 설정
-
-```bash
-cp -n .env.example .env
-```
-
-기존 `.env`가 있으면 유지되고, 없을 때만 생성됩니다. 그 다음 `.env` 파일을 편집하여 설정합니다:
-
-```env
-TELEGRAM_BOT_TOKEN=your_bot_token_here
-```
-
-LLM 설정은 프로젝트 루트의 `model.json`에서 관리합니다:
-
-```json
-{
-  "model": "gpt-5.2",
-  "contextWindow": 400000,
-  "reasoningEffort": "medium"
-}
-```
-
-## 사용법
-
-### 1. Codex OAuth 로그인
-
-```bash
-npm run login
-```
-
-브라우저에서 표시된 URL을 열고 ChatGPT 계정으로 로그인합니다.
-Codex 인증 정보는 `data/auth/codex.json`에 저장됩니다.
-
-### 2. 봇 시작
-
-```bash
-npm start
-```
-
-### 3. 텔레그램에서 대화
-
-봇에게 메시지를 보내면 에이전트가 작업을 수행합니다.
-
-처음 보는 텔레그램 계정이 메시지를 보내면, 봇이 고유한 승인 코드를 안내합니다. 서버에서 아래 명령으로 해당 계정을 승인하세요:
-
-```bash
-igobot ok ABC12345
-```
-
-텔레그램 승인 정보와 대기 중인 요청은 `data/auth/telegram.json`에 저장됩니다.
-
-**명령어:**
-- `/start` — 봇 시작 안내
-- `/reset` — 대화 초기화
-- `/status` — 상태 확인
-
-## 커스텀 도구 추가
-
-`src/tools/` 디렉토리에 `.js` 파일을 추가하면 자동으로 로드됩니다.
-
-```javascript
-// src/tools/my-tool.js
-export default {
-  name: 'my_tool',
-  description: '도구 설명',
-  requiresApproval: false,  // true면 실행 전 텔레그램에서 승인 요청
-  schema: {
-    type: 'object',
-    properties: {
-      param1: { type: 'string', description: '파라미터 설명' }
-    },
-    required: ['param1']
-  },
-  async execute(args, context) {
-    // args.param1 사용
-    return '결과 문자열';
-  }
-};
-```
-
-하나의 파일에서 여러 도구를 배열로 export할 수도 있습니다:
-
-```javascript
-export default [tool1, tool2, tool3];
-```
+1. Run the script above on macOS or Debian, Fedora, Arch.
+2. When your operating system information is displayed, press Enter to continue.
+3. After the installation is complete, you will automatically enter the settings page. Proceed with settings such as your Telegram bot token and language.
+4. At the end of the setup, when prompted to log in to Codex OAuth, open the link in a browser and log in.
+5. Run `igobot start` in the terminal.
+6. When you send a message via Telegram, an approval command will be displayed. Run this command in the terminal on the computer where igobot is running.
