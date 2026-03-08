@@ -223,6 +223,9 @@ async function showLogs(args) {
         tail.on("error", (err) => {
             console.error("Log output error:", err.message);
         });
+        tail.on("close", (code) => {
+            process.exit(code || 0);
+        });
     }
 }
 
@@ -243,6 +246,11 @@ async function runLogin() {
 async function runSetup() {
     const { runOnboarding } = await import("../src/onboarding/index.js");
     await runOnboarding();
+    if (process.stdin.isTTY) {
+        try { process.stdin.setRawMode(false); } catch {}
+    }
+    process.stdin.pause();
+    process.exit(0);
 }
 
 async function checkFirstRun() {
