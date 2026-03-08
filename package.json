@@ -18,6 +18,7 @@
         "node": ">=20.0.0"
     },
     "dependencies": {
+        "@clack/prompts": "^1.1.0",
         "dotenv": "^16.4.7",
         "playwright": "^1.50.0",
         "telegraf": "^4.16.3",
