@@ -654,9 +654,8 @@ main() {
     setup_config
     show_complete
 
-    # 설정 마법사 실행 (반드시 /dev/tty 에서 입력 받아야 @clack/prompts 가 정상 동작)
-    node "$INSTALL_DIR/bin/igobot.js" setup </dev/tty
+    # bash → node 로 프로세스 교체 (exec) — node 종료 시 bash 잔존 없이 터미널 즉시 반환
+    exec node "$INSTALL_DIR/bin/igobot.js" setup </dev/tty
 }
 
 main "$@"
-exit 0
