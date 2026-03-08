@@ -87,7 +87,7 @@ const translations = {
         },
 
         // 온보딩 완료 / 취소
-        outro: "👉 Running 'igobot start'...",
+        outro: "👉 Run 'igobot start' to start igobot.",
         cancel: "Setup cancelled.",
         error_prefix: "Error during setup",
 
@@ -278,7 +278,7 @@ Web scraping rules:
         },
 
         // 온보딩 완료 / 취소
-        outro: "👉 'igobot start'를 실행합니다...",
+        outro: "👉 'igobot start'를 입력해 igobot을 시작하세요.",
         cancel: "설정을 취소했습니다.",
         error_prefix: "설정 중 오류 발생",
 

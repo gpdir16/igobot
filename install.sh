@@ -653,7 +653,6 @@ main() {
     install_global
     setup_config
     show_complete
-    igobot setup
 }
 
 main "$@"
