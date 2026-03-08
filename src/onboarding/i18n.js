@@ -15,7 +15,7 @@ const translations = {
 
         // 온보딩 시작
         intro: {
-            title: " igobot 초기 설정 마법사",
+            title: "igobot 초기 설정 마법사",
         },
 
         // 환영 메시지
@@ -94,7 +94,7 @@ const translations = {
         },
 
         intro: {
-            title: " igobot Setup Wizard ",
+            title: "igobot Setup Wizard ",
         },
 
         welcome: {
