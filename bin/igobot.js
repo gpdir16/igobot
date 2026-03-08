@@ -118,6 +118,7 @@ async function startBot() {
 
     console.log(`igobot started (PID: ${child.pid})`);
     console.log(`Log file: ${LOG_FILE}`);
+    process.exit(0);
 }
 
 async function stopBot() {

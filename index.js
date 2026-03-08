@@ -3,19 +3,8 @@ import Agent from "./src/core/agent.js";
 import TelegramBot from "./src/telegram/bot.js";
 import SkillLoader from "./src/core/skill-loader.js";
 import logger from "./src/utils/logger.js";
-import { needsOnboarding, runOnboarding } from "./src/onboarding/index.js";
 
 async function main() {
-    // 첫 실행 감지: 필수 설정이 없으면 온보딩 실행
-    if (needsOnboarding()) {
-        console.log("\n⚙️  igobot 초기 설정이 필요합니다.\n");
-        await runOnboarding({ isFirstRun: true });
-        console.log("\n봇을 다시 시작합니다...\n");
-        // 환경변수 재로드를 위해 dotenv 재실행 후 계속 진행
-        const { config: dotenvConfig } = await import("dotenv");
-        dotenvConfig({ override: true });
-    }
-
     logger.info("igobot 시작 중...");
 
     // 에이전트 초기화 (기본 도구 로드)
