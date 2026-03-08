@@ -43,10 +43,10 @@ npx playwright install firefox
 ## 설정
 
 ```bash
-cp .env.example .env
+cp -n .env.example .env
 ```
 
-`.env` 파일을 편집하여 설정합니다:
+기존 `.env`가 있으면 유지되고, 없을 때만 생성됩니다. 그 다음 `.env` 파일을 편집하여 설정합니다:
 
 ```env
 TELEGRAM_BOT_TOKEN=your_bot_token_here
@@ -118,36 +118,3 @@ export default {
 ```javascript
 export default [tool1, tool2, tool3];
 ```
-
-## 프로젝트 구조
-
-```
-igobot/
-├── index.js                  # 엔트리포인트
-├── auth.json                 # Codex OAuth 토큰 (자동 생성)
-├── .env                      # 환경 설정
-├── package.json
-└── src/
-    ├── core/
-    │   ├── agent.js          # 에이전트 루프 (LLM ↔ 도구)
-    │   ├── config.js         # 설정 로더
-    │   └── module-loader.js  # 동적 도구 로더
-    ├── llm/
-    │   ├── codex-auth.js     # OAuth PKCE 인증
-    │   └── codex-client.js   # Codex API 클라이언트
-    ├── telegram/
-    │   └── bot.js            # 텔레그램 봇 + 승인 시스템
-    ├── tools/
-    │   ├── terminal.js       # 터미널 명령 실행
-    │   ├── filesystem.js     # 파일 읽기/쓰기/검색
-    │   └── browser.js        # Playwright Firefox 자동화
-    └── utils/
-        └── logger.js         # 로깅
-```
-
-## 사용 권장 모델
-
-| 모델 | 설명 |
-|------|------|
-| `gpt-5.2` | GPT-5.2 기본 |
-| `gpt-5.3-codex` | GPT-5.3 코딩 특화 (추천 모델) |
