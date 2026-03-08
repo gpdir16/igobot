@@ -243,7 +243,9 @@ async function runLogin() {
 async function runSetup() {
     const { runOnboarding } = await import("../src/onboarding/index.js");
     await runOnboarding();
-    await startBot();
+    const { spawnSync } = await import("child_process");
+    spawnSync(process.execPath, [__filename, "start"], { stdio: "inherit" });
+    process.exit(0);
 }
 
 async function checkFirstRun() {
