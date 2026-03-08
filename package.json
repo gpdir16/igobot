@@ -9,6 +9,7 @@
     },
     "scripts": {
         "start": "node index.js",
+        "setup": "node src/onboarding/index.js",
         "login": "node src/llm/codex-auth.js",
         "dev": "node --watch index.js"
     },

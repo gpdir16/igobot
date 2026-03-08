@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__claude-for-cheap__summarize_codebase"
+    ]
+  }
+}

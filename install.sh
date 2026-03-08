@@ -62,6 +62,7 @@ txt() {
             no) echo "아니오" ;;
             continue) echo "아무 키나 누르세요" ;;
             navigate) echo "↑/↓ 이동  Enter 선택" ;;
+            setup_now) echo "설정 마법사를 시작합니다..." ;;
             *) echo "$key" ;;
         esac
     else
@@ -103,6 +104,7 @@ txt() {
             no) echo "No" ;;
             continue) echo "Press any key to continue" ;;
             navigate) echo "↑/↓ Navigate  Enter Select" ;;
+            setup_now) echo "Starting setup wizard..." ;;
             *) echo "$key" ;;
         esac
     fi
@@ -568,16 +570,7 @@ show_complete() {
     echo ""
     echo "${GREEN}$(txt complete)${RESET}"
     echo ""
-    echo "${BOLD}$(txt next)${RESET}"
-    echo ""
-    echo "  1. $(txt step1)"
-    echo "     ${CYAN}igobot login${RESET}"
-    echo ""
-    echo "  2. $(txt step2)"
-    echo "     ${CYAN}nano $INSTALL_DIR/.env${RESET}"
-    echo ""
-    echo "  3. $(txt step3)"
-    echo "     ${CYAN}igobot start${RESET}"
+    echo "$(txt path): ${CYAN}$INSTALL_DIR${RESET}"
     echo ""
     echo "${BOLD}$(txt cmds)${RESET}"
     echo ""
@@ -586,7 +579,7 @@ show_complete() {
     echo "  ${GREEN}igobot status${RESET}  - Check status"
     echo "  ${GREEN}igobot logs${RESET}    - View logs"
     echo ""
-    echo "$(txt path): ${CYAN}$INSTALL_DIR${RESET}"
+    echo "${CYAN}▶ $(txt setup_now)${RESET}"
     echo ""
 }
 
@@ -655,6 +648,7 @@ main() {
     install_global
     setup_config
     show_complete
+    igobot setup
 }
 
 main "$@"

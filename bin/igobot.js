@@ -15,6 +15,7 @@ const args = process.argv.slice(3);
 async function runCommand(cmd, args) {
     switch (cmd) {
         case "start":
+            await checkFirstRun();
             await startBot();
             break;
         case "stop":
@@ -32,6 +33,9 @@ async function runCommand(cmd, args) {
             break;
         case "login":
             await runLogin();
+            break;
+        case "setup":
+            await runSetup();
             break;
         case "help":
         case "--help":
@@ -57,6 +61,7 @@ Usage:
   igobot <command> [options]
 
 Commands:
+  setup     Run interactive setup wizard (first-time or reconfiguration)
   start     Start igobot in background
   stop      Stop running igobot
   restart   Restart igobot
@@ -67,6 +72,7 @@ Commands:
   help      Show this help
 
 Examples:
+  igobot setup      # Configure igobot (run this first!)
   igobot start      # Start in background
   igobot status     # Check status
   igobot logs -f    # Follow logs in real-time
@@ -81,8 +87,8 @@ async function startBot() {
     if (existsSync(PID_FILE)) {
         const pid = parseInt(readFileSync(PID_FILE, "utf-8").trim(), 10);
         if (isProcessRunning(pid)) {
-            console.log(`igobot is already running (PID: ${pid})`);
-            return;
+            console.log(`igobot이 실행 중입니다 (PID: ${pid}). 재시작합니다...`);
+            await stopBot();
         }
     }
 
@@ -222,6 +228,20 @@ async function runLogin() {
     child.on("exit", (code) => {
         process.exit(code || 0);
     });
+}
+
+async function runSetup() {
+    const { runOnboarding } = await import("../src/onboarding/index.js");
+    await runOnboarding();
+    await startBot();
+}
+
+async function checkFirstRun() {
+    const { needsOnboarding, runOnboarding } = await import("../src/onboarding/index.js");
+    if (needsOnboarding()) {
+        console.log("\n첫 실행입니다. 설정을 시작합니다...\n");
+        await runOnboarding({ isFirstRun: true });
+    }
 }
 
 function isProcessRunning(pid) {
