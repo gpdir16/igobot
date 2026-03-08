@@ -40,6 +40,9 @@ function writeEnv(env) {
         "# igobot Configuration",
         "# WARNING: Never share this file externally!",
         "",
+        "# Enabled messengers (comma-separated; current implementation: telegram)",
+        `ENABLED_MESSENGERS=${env.ENABLED_MESSENGERS ?? "telegram"}`,
+        "",
         "# Telegram bot token (from @BotFather)",
         `TELEGRAM_BOT_TOKEN=${env.TELEGRAM_BOT_TOKEN ?? ""}`,
         "",
@@ -160,6 +163,7 @@ export async function runOnboarding({ isFirstRun = false } = {}) {
     s.start(t("save.saving"));
 
     writeEnv({
+        ENABLED_MESSENGERS: existingEnv.ENABLED_MESSENGERS || "telegram",
         TELEGRAM_BOT_TOKEN: botToken || existingEnv.TELEGRAM_BOT_TOKEN,
         AGENT_MAX_ITERATIONS: maxIterations,
         LOG_LEVEL: logLevel,

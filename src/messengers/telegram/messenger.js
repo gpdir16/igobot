@@ -1,30 +1,27 @@
 import { Telegraf, Markup } from "telegraf";
-import { createReadStream, existsSync, writeFileSync, mkdirSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import config from "../core/config.js";
-import { createTelegramAccessRequest } from "../core/telegram-auth-store.js";
-import logger from "../utils/logger.js";
-import { markdownToTelegramHtml, escapeHtml, splitAndConvert } from "../utils/markdown.js";
-import { getT } from "../i18n.js";
+import config from "../../core/config.js";
+import { getT } from "../../i18n.js";
+import logger from "../../utils/logger.js";
+import { escapeHtml, markdownToTelegramHtml, splitAndConvert } from "../../utils/markdown.js";
+import BaseMessenger from "../base-messenger.js";
+import { createTelegramAccessRequest } from "./auth-store.js";
 
-// 텔레그램 봇 모듈 (메시지 수신, 승인, 스트리밍, 도구기록 처리)
-class TelegramBot {
+class TelegramMessenger extends BaseMessenger {
     constructor() {
+        super({ key: "telegram" });
         this.bot = null;
         this._pendingApprovals = new Map();
-        this.yoloRuns = new Set();
-        this.onMessage = null;
-        this.onReset = null;
     }
 
     async start(messageHandler) {
-        const token = config.telegram.token;
+        const token = config.messengers.telegram.token;
         if (!token) throw new Error(getT()("bot.token_missing"));
 
         this.bot = new Telegraf(token);
         this.onMessage = messageHandler;
 
-        // 사용자 인증 미들웨어
         this.bot.use(async (ctx, next) => {
             if (!ctx.from) return next();
             if (ctx.from.is_bot) return next();
@@ -61,8 +58,6 @@ class TelegramBot {
                     logger.warn(`Failed to send Telegram access request message: ${err.message}`);
                 }
             }
-
-            return;
         });
 
         this.bot.start((ctx) => {
@@ -78,7 +73,6 @@ class TelegramBot {
             ctx.reply(getT()("bot.status"));
         });
 
-        // ===== 승인 콜백 =====
         this.bot.action(/^approve:(.+)$/, async (ctx) => {
             const id = ctx.match[1];
             const pending = this._pendingApprovals.get(id);
@@ -92,12 +86,11 @@ class TelegramBot {
             }
         });
 
-        // YOLO: 현재 승인 + 이 작업의 나머지 도구 모두 자동 승인
         this.bot.action(/^yolo:(.+)$/, async (ctx) => {
             const id = ctx.match[1];
             const pending = this._pendingApprovals.get(id);
             if (pending) {
-                this.yoloRuns.add(pending.chatId);
+                this.enableYoloRun(pending.chatId);
                 pending.resolve(true);
                 this._pendingApprovals.delete(id);
                 await ctx.answerCbQuery(getT()("bot.yolo_on"));
@@ -120,24 +113,20 @@ class TelegramBot {
             }
         });
 
-        // ===== 메시지 수신 (모든 타입) — fire-and-forget =====
-
         this.bot.on("text", (ctx) => {
-            if (!this.onMessage) return;
             const msg = {
                 type: "text",
                 text: ctx.message.text,
                 replyToMessageId: ctx.message.reply_to_message?.message_id || null,
                 messageId: ctx.message.message_id,
             };
-            this.onMessage(ctx.chat.id, msg).catch((err) => {
+            this.emitMessage(ctx.chat.id, msg).catch((err) => {
                 logger.error("Message handling error:", err);
                 this.send(ctx.chat.id, getT()("bot.error", { msg: err.message })).catch(() => {});
             });
         });
 
         this.bot.on("photo", async (ctx) => {
-            if (!this.onMessage) return;
             const photos = ctx.message.photo;
             const largest = photos[photos.length - 1];
             let photoUrl = null;
@@ -153,11 +142,10 @@ class TelegramBot {
                 replyToMessageId: ctx.message.reply_to_message?.message_id || null,
                 messageId: ctx.message.message_id,
             };
-            this.onMessage(ctx.chat.id, msg).catch(() => {});
+            this.emitMessage(ctx.chat.id, msg).catch(() => {});
         });
 
         this.bot.on("document", async (ctx) => {
-            if (!this.onMessage) return;
             const doc = ctx.message.document;
             let fileUrl = null;
             try {
@@ -174,22 +162,20 @@ class TelegramBot {
                 replyToMessageId: ctx.message.reply_to_message?.message_id || null,
                 messageId: ctx.message.message_id,
             };
-            this.onMessage(ctx.chat.id, msg).catch(() => {});
+            this.emitMessage(ctx.chat.id, msg).catch(() => {});
         });
 
         this.bot.on("sticker", (ctx) => {
-            if (!this.onMessage) return;
             const msg = {
                 type: "sticker",
                 text: getT()("bot.sticker", { emoji: ctx.message.sticker.emoji || "" }),
                 replyToMessageId: ctx.message.reply_to_message?.message_id || null,
                 messageId: ctx.message.message_id,
             };
-            this.onMessage(ctx.chat.id, msg).catch(() => {});
+            this.emitMessage(ctx.chat.id, msg).catch(() => {});
         });
 
         this.bot.on("voice", async (ctx) => {
-            if (!this.onMessage) return;
             let fileUrl = null;
             try {
                 const link = await ctx.telegram.getFileLink(ctx.message.voice.file_id);
@@ -203,11 +189,10 @@ class TelegramBot {
                 replyToMessageId: ctx.message.reply_to_message?.message_id || null,
                 messageId: ctx.message.message_id,
             };
-            this.onMessage(ctx.chat.id, msg).catch(() => {});
+            this.emitMessage(ctx.chat.id, msg).catch(() => {});
         });
 
         this.bot.on("location", (ctx) => {
-            if (!this.onMessage) return;
             const loc = ctx.message.location;
             const msg = {
                 type: "location",
@@ -217,18 +202,16 @@ class TelegramBot {
                 replyToMessageId: ctx.message.reply_to_message?.message_id || null,
                 messageId: ctx.message.message_id,
             };
-            this.onMessage(ctx.chat.id, msg).catch(() => {});
+            this.emitMessage(ctx.chat.id, msg).catch(() => {});
         });
 
-        // 봇 시작
         await this.bot.launch();
-        logger.info("Telegram bot started");
-
-        process.once("SIGINT", () => this.bot.stop("SIGINT"));
-        process.once("SIGTERM", () => this.bot.stop("SIGTERM"));
+        logger.info("Telegram messenger started");
     }
 
-    // ==================== 전송 API ====================
+    stop(reason = "shutdown") {
+        this.bot?.stop(reason);
+    }
 
     async sendTyping(chatId) {
         if (!this.bot) return;
@@ -237,7 +220,6 @@ class TelegramBot {
         } catch {}
     }
 
-    // 메시지 전송 (마크다운 자동 변환 → HTML)
     async send(chatId, text, options = {}) {
         if (!this.bot) return;
         const chunks = splitAndConvert(text, 3000);
@@ -251,13 +233,11 @@ class TelegramBot {
         return lastMsgId;
     }
 
-    // 이미 HTML인 텍스트 전송 (변환 없음)
     async sendHtml(chatId, html, options = {}) {
         if (!this.bot) return;
-        // HTML은 이미 변환됨 — 4000자 초과 시만 자름 (입력이 유효 HTML임을 전제)
-        const MAX = 4000;
+        const maxLength = 4000;
         const parts = [];
-        for (let i = 0; i < html.length; i += MAX) parts.push(html.slice(i, i + MAX));
+        for (let i = 0; i < html.length; i += maxLength) parts.push(html.slice(i, i + maxLength));
         let lastMsgId;
         for (const part of parts) {
             const msg = await this.bot.telegram.sendMessage(chatId, part, {
@@ -321,35 +301,8 @@ class TelegramBot {
         } catch {}
     }
 
-    async pinMessage(chatId, messageId, silent = true) {
-        if (!this.bot) return;
-        try {
-            await this.bot.telegram.pinChatMessage(chatId, messageId, {
-                disable_notification: silent,
-            });
-        } catch {}
-    }
-
-    async unpinMessage(chatId, messageId) {
-        if (!this.bot) return;
-        try {
-            await this.bot.telegram.unpinChatMessage(chatId, { message_id: messageId });
-        } catch {}
-    }
-
-    async reply(chatId, replyToMessageId, text) {
-        if (!this.bot) return;
-        const html = markdownToTelegramHtml(text);
-        const msg = await this.bot.telegram.sendMessage(chatId, html, {
-            parse_mode: "HTML",
-            reply_parameters: { message_id: replyToMessageId },
-        });
-        return msg.message_id;
-    }
-
     async sendPhoto(chatId, photoSource, caption = "") {
         if (!this.bot) return;
-        // 로컬 파일 경로면 스트림으로 변환
         const source =
             typeof photoSource === "string" && !photoSource.startsWith("http") && existsSync(photoSource)
                 ? { source: createReadStream(photoSource) }
@@ -363,7 +316,6 @@ class TelegramBot {
 
     async sendDocument(chatId, docSource, fileName = "", caption = "") {
         if (!this.bot) return;
-        // 로컬 파일 경로면 스트림으로 변환
         const source =
             typeof docSource === "string" && !docSource.startsWith("http") && existsSync(docSource)
                 ? { source: createReadStream(docSource), filename: fileName || docSource.split("/").pop() }
@@ -375,14 +327,12 @@ class TelegramBot {
         return msg.message_id;
     }
 
-    // ==================== 승인 ====================
-
-    // 승인 요청 (HTML + 코드블록, 승인/거부 후 메시지 삭제)
     async requestApproval(chatId, toolName, args) {
+        if (!this.bot) return false;
         const t = getT();
         const approvalId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const raw = typeof args === "string" ? args : JSON.stringify(args, null, 2);
-        const argsStr = raw.length > 1500 ? raw.slice(0, 1500) + "\n" + t("bot.approval_truncated") : raw;
+        const argsStr = raw.length > 1500 ? `${raw.slice(0, 1500)}\n${t("bot.approval_truncated")}` : raw;
 
         const message =
             `${t("bot.approval_title")}\n\n` +
@@ -399,23 +349,17 @@ class TelegramBot {
         });
 
         return new Promise((resolve) => {
-            this._pendingApprovals.set(approvalId, { resolve, msgId: sent.message_id, chatId });
-            setTimeout(
-                () => {
-                    if (this._pendingApprovals.has(approvalId)) {
-                        this._pendingApprovals.delete(approvalId);
-                        this.deleteMessage(chatId, sent.message_id).catch(() => {});
-                        resolve(false);
-                    }
-                },
-                3 * 60 * 1000,
-            );
+            this._pendingApprovals.set(approvalId, { resolve, chatId, msgId: sent.message_id });
+            setTimeout(() => {
+                if (this._pendingApprovals.has(approvalId)) {
+                    this._pendingApprovals.delete(approvalId);
+                    this.deleteMessage(chatId, sent.message_id).catch(() => {});
+                    resolve(false);
+                }
+            }, 3 * 60 * 1000);
         });
     }
 
-    // ==================== 도구 기록 ====================
-
-    // 도구 기록을 파일로만 저장
     saveToolLogToFile(toolHistory) {
         if (!toolHistory || toolHistory.length === 0) return null;
         const t = getT();
@@ -425,8 +369,8 @@ class TelegramBot {
             for (const entry of toolHistory) {
                 lines.push(`[${entry.name}]`);
                 if (entry.args) {
-                    const s = typeof entry.args === "string" ? entry.args : JSON.stringify(entry.args, null, 2);
-                    lines.push(`${t("bot.tool_log_args")}\n${s}`);
+                    const value = typeof entry.args === "string" ? entry.args : JSON.stringify(entry.args, null, 2);
+                    lines.push(`${t("bot.tool_log_args")}\n${value}`);
                 }
                 if (entry.result) {
                     lines.push(`${t("bot.tool_log_result")}\n${entry.result}`);
@@ -450,14 +394,9 @@ class TelegramBot {
         }
     }
 
-    // ==================== 스트리밍 (공식 sendMessageDraft API) ====================
-
-    // 스트리밍 시작: draft_id 생성/반환
     async startStream(chatId) {
         await this.sendTyping(chatId);
-        // draft_id는 0이 아닌 고유 정수
         const draftId = (Date.now() % 2147483647) + 1;
-        // 초기 드래프트 전송
         try {
             await this.bot.telegram.callApi("sendMessageDraft", {
                 chat_id: chatId,
@@ -470,10 +409,20 @@ class TelegramBot {
         return draftId;
     }
 
-    // 스트리밍 업데이트: 같은 draft_id로 텍스트 갱신
+    async clearStream(chatId, draftId) {
+        if (!this.bot || !draftId) return;
+        try {
+            await this.bot.telegram.callApi("sendMessageDraft", {
+                chat_id: chatId,
+                draft_id: draftId,
+                text: " ",
+            });
+        } catch {}
+    }
+
     async updateStream(chatId, draftId, text) {
-        if (!text || text.length === 0) return;
-        const raw = text.length > 3800 ? "..." + text.slice(-3700) : text;
+        if (!this.bot || !text) return;
+        const raw = text.length > 3800 ? `...${text.slice(-3700)}` : text;
         const html = markdownToTelegramHtml(raw);
         try {
             await this.bot.telegram.callApi("sendMessageDraft", {
@@ -487,18 +436,9 @@ class TelegramBot {
         }
     }
 
-    // 스트리밍 종료: 최종 메시지를 sendMessage로 확정
     async finishStream(chatId, draftId, text, toolHistory = null) {
-        // 드래프트를 빈 텍스트로 제거 (선택적)
-        try {
-            await this.bot.telegram.callApi("sendMessageDraft", {
-                chat_id: chatId,
-                draft_id: draftId,
-                text: " ",
-            });
-        } catch {}
+        await this.clearStream(chatId, draftId);
 
-        // 도구 기록이 있으면 파일로만 저장 (전송하지 않음)
         if (toolHistory && toolHistory.length > 0) {
             this.saveToolLogToFile(toolHistory);
         }
@@ -511,4 +451,4 @@ class TelegramBot {
     }
 }
 
-export default TelegramBot;
+export default TelegramMessenger;

@@ -266,7 +266,7 @@ async function runSetup() {
 async function approveTelegramAccess(args) {
     await import("dotenv/config");
     const { getT } = await import("../src/i18n.js");
-    const { approveTelegramAccessCode, formatTelegramAccountLabel } = await import("../src/core/telegram-auth-store.js");
+    const { approveTelegramAccessCode, formatTelegramAccountLabel } = await import("../src/messengers/telegram/auth-store.js");
 
     const t = getT();
     const code = args[0];

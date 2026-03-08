@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { ensureAuthDir, getTelegramAuthFile } from "./auth-paths.js";
+import { ensureAuthDir, getTelegramAuthFile } from "../../core/auth-paths.js";
+
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CODE_LENGTH = 8;
 const MAX_CODE_HISTORY = 2000;

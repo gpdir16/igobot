@@ -34,10 +34,29 @@ class Config {
         }
     }
 
-    get telegram() {
-        return {
+    _parseList(value) {
+        return String(value || "")
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean);
+    }
+
+    get messengers() {
+        const requested = this._parseList(process.env.ENABLED_MESSENGERS);
+        const telegram = {
             token: process.env.TELEGRAM_BOT_TOKEN,
         };
+
+        const enabled = requested.length > 0 ? requested : telegram.token ? ["telegram"] : [];
+
+        return {
+            enabled,
+            telegram,
+        };
+    }
+
+    get telegram() {
+        return this.messengers.telegram;
     }
 
     get llm() {

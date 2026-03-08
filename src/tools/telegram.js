@@ -14,10 +14,10 @@ function resolveSource(filePath, fileName = "") {
     return { type: "local", value: absPath };
 }
 
-// 사용자에게 사진 파일 전송 (context.bot 필요)
+// 사용자에게 사진 파일 전송 (현재 메신저 컨텍스트 사용)
 export const sendPhoto = {
     name: "send_photo",
-    description: "Sends an image file or URL to the user as a Telegram photo.",
+    description: "Sends an image file or URL to the user in the current messenger.",
     requiresApproval: false,
     schema: {
         type: "object",
@@ -29,10 +29,14 @@ export const sendPhoto = {
     },
     async execute(args, context = {}) {
         const { path: filePath, caption = "" } = args;
-        const { chatId, bot } = context;
+        const { chatId } = context;
+        const messenger = context.messenger || context.bot;
 
-        if (!bot) return "Error: bot instance not available.";
+        if (!messenger) return "Error: messenger instance not available.";
         if (!chatId) return "Error: chatId not available.";
+        if (typeof messenger.sendPhoto !== "function") {
+            return `Current messenger does not support photo sending: ${context.messengerKey || messenger.key || "unknown"}`;
+        }
 
         const src = resolveSource(filePath);
 
@@ -41,7 +45,7 @@ export const sendPhoto = {
         }
 
         try {
-            await bot.sendPhoto(chatId, src.value, caption);
+            await messenger.sendPhoto(chatId, src.value, caption);
             return `Photo sent: ${filePath}`;
         } catch (err) {
             return `Failed to send photo: ${err.message}`;
@@ -52,7 +56,7 @@ export const sendPhoto = {
 // 사용자에게 문서/파일 전송
 export const sendDocument = {
     name: "send_document",
-    description: "Sends a file or URL to the user as a Telegram document. Supports all file types.",
+    description: "Sends a file or URL to the user in the current messenger. Supports all file types.",
     requiresApproval: false,
     schema: {
         type: "object",
@@ -64,10 +68,14 @@ export const sendDocument = {
     },
     async execute(args, context = {}) {
         const { path: filePath, caption = "" } = args;
-        const { chatId, bot } = context;
+        const { chatId } = context;
+        const messenger = context.messenger || context.bot;
 
-        if (!bot) return "Error: bot instance not available.";
+        if (!messenger) return "Error: messenger instance not available.";
         if (!chatId) return "Error: chatId not available.";
+        if (typeof messenger.sendDocument !== "function") {
+            return `Current messenger does not support document sending: ${context.messengerKey || messenger.key || "unknown"}`;
+        }
 
         const src = resolveSource(filePath);
 
@@ -77,7 +85,7 @@ export const sendDocument = {
 
         const fileName = src.type === "local" ? src.value.split("/").pop() : filePath.split("/").pop();
         try {
-            await bot.sendDocument(chatId, src.value, fileName, caption);
+            await messenger.sendDocument(chatId, src.value, fileName, caption);
             return `Document sent: ${filePath}`;
         } catch (err) {
             return `Failed to send document: ${err.message}`;
