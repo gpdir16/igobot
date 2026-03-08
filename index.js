@@ -22,8 +22,8 @@ async function main() {
     const skillLoader = new SkillLoader();
     await skillLoader.loadSkills();
 
-    // SKILL.md 본문을 에이전트 시스템 프롬프트에 주입
-    agent.addSkillSection(skillLoader.getSystemPromptSection());
+    // 스킬 로더를 에이전트에 주입 (지연 로딩 — 필요시에만 스킬 본문 로드)
+    agent.setSkillLoader(skillLoader);
 
     // 메시지 핸들러 등록 및 봇 시작
     const messageHandler = (chatId, msg) => agent.handleMessage(chatId, msg);

@@ -64,7 +64,25 @@ class SkillLoader {
         }
     }
 
-    // 에이전트 시스템 프롬프트에 주입할 스킬 지시문 반환
+    // 스킬 목록 반환 (이름 + 설명만, 레지스트리용)
+    getSkillList() {
+        return Array.from(this.skills.entries()).map(([name, skill]) => ({
+            name,
+            description: skill.meta.description || name,
+        }));
+    }
+
+    // 특정 스킬 조회
+    getSkill(name) {
+        return this.skills.get(name) || null;
+    }
+
+    // 스킬 존재 여부 확인
+    hasSkill(name) {
+        return this.skills.has(name);
+    }
+
+    // 에이전트 시스템 프롬프트에 주입할 스킬 지시문 반환 (레거시 — 사용 중단 예정)
     getSystemPromptSection() {
         if (this.skills.size === 0) return null;
 
