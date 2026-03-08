@@ -186,7 +186,7 @@ Use the provided tools freely to fulfill user requests.
 - This is an agent running on a server. There is no GUI or screen.
 - Everything you want to show the user must be sent as a Telegram message.
 - Code execution results, file contents, etc. should be delivered as text.
-- **File operations (write_file, delete_file) are only allowed within the data/workspace/ directory.** Use relative paths from this base.
+- **For file operations (write_file, delete_file), use \`inWorkspace: true\` for normal data/workspace/ edits.** Set \`inWorkspace: false\` only when you must edit a path outside the workspace.
 - If the user sends an image, you can see it directly. Image analysis is supported.
 
 Available tools:
@@ -194,8 +194,8 @@ Available tools:
 - read_file: Read file contents
 - list_directory: List directory contents
 - search_files: Search for text in files
-- write_file: Create/modify files (relative to data/workspace/)
-- delete_file: Delete files (relative to data/workspace/)
+- write_file: Create/modify files (\`inWorkspace:true\` => data/workspace/ relative, \`false\` => cwd-relative or absolute path)
+- delete_file: Delete files (\`inWorkspace:true\` => data/workspace/ relative, \`false\` => cwd-relative or absolute path)
 - browser_fetch: Fetch web page content
 - browser_interact: Interact with web pages
 - send_photo: Send a local file or URL to the user as a photo
@@ -395,7 +395,7 @@ Web scraping rules:
 - 이것은 서버에서 실행되는 에이전트입니다. GUI나 화면이 없습니다.
 - 사용자에게 보여줄 모든 내용은 반드시 텔레그램 메시지로 전송해야 합니다.
 - 코드 실행 결과, 파일 내용 등도 사용자에게 텍스트로 전달하세요.
-- **파일 작업(write_file, delete_file)은 data/workspace/ 디렉토리 내에서만 가능합니다.** 이 경로를 기준으로 상대 경로를 사용하세요.
+- **파일 작업(write_file, delete_file)은 기본적으로 \`inWorkspace: true\`로 \`data/workspace/\` 안에서 처리하세요.** 워크스페이스 밖 경로를 꼭 수정해야 할 때만 \`inWorkspace: false\`를 사용하세요.
 - 사용자가 이미지를 보내면 직접 볼 수 있습니다. 이미지 분석이 가능합니다.
 
 사용 가능한 도구:
@@ -403,8 +403,8 @@ Web scraping rules:
 - read_file: 파일 내용 읽기
 - list_directory: 디렉토리 내용 목록
 - search_files: 파일에서 텍스트 검색
-- write_file: 파일 생성/수정 (data/workspace/ 기준)
-- delete_file: 파일 삭제 (data/workspace/ 기준)
+- write_file: 파일 생성/수정 (\`inWorkspace:true\`면 data/workspace/ 기준, \`false\`면 현재 작업 디렉토리 기준 상대 경로 또는 절대 경로)
+- delete_file: 파일 삭제 (\`inWorkspace:true\`면 data/workspace/ 기준, \`false\`면 현재 작업 디렉토리 기준 상대 경로 또는 절대 경로)
 - browser_fetch: 웹페이지 내용 가져오기
 - browser_interact: 웹페이지 인터랙션
 - send_photo: 로컬 파일 또는 URL을 사용자에게 사진으로 전송

@@ -19,8 +19,8 @@ Telegram 메신저를 통해 상호작용하는 AI 에이전트입니다. OpenAI
 | `read_file` | 파일 읽기 | ❌ |
 | `list_directory` | 디렉토리 목록 | ❌ |
 | `search_files` | 텍스트 검색 | ❌ |
-| `write_file` | 파일 작성 | ✅ |
-| `delete_file` | 파일 삭제 | ✅ |
+| `write_file` | 파일 작성 (`inWorkspace:true` 기본, `false`면 외부 경로 허용) | ✅ |
+| `delete_file` | 파일 삭제 (`inWorkspace:true` 기본, `false`면 외부 경로 허용) | ✅ |
 | `browser_fetch` | 웹페이지 가져오기 | ❌ |
 | `browser_screenshot` | 스크린샷 | ✅ |
 | `browser_interact` | 웹 인터랙션 | ✅ |

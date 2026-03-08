@@ -5,6 +5,25 @@ const WORKSPACE_DIR = resolve(process.cwd(), "data", "workspace");
 // 시작 시 workspace 디렉토리 보장
 if (!existsSync(WORKSPACE_DIR)) mkdirSync(WORKSPACE_DIR, { recursive: true });
 
+function isWithinDir(targetPath, baseDir) {
+    return targetPath === baseDir || targetPath.startsWith(baseDir + "/");
+}
+
+function resolveManagedPath(filePath, inWorkspace = true) {
+    if (inWorkspace) {
+        const absPath = filePath.startsWith("/") ? resolve(filePath) : resolve(WORKSPACE_DIR, filePath);
+        if (!isWithinDir(absPath, WORKSPACE_DIR)) {
+            return {
+                error: `Error: when inWorkspace is true, the path must stay inside data/workspace/. (requested: ${filePath})`,
+            };
+        }
+        return { absPath };
+    }
+
+    const absPath = filePath.startsWith("/") ? resolve(filePath) : resolve(process.cwd(), filePath);
+    return { absPath };
+}
+
 // 파일시스템 도구 모음 (읽기 자율, 쓰기 승인 필요)
 
 // 읽기 도구: 파일 내용 읽기
@@ -133,22 +152,24 @@ export const searchFiles = {
 export const writeFile = {
     name: "write_file",
     description:
-        "Creates or overwrites a file. Only paths inside data/workspace/ are allowed. Relative paths are resolved from data/workspace/.",
+        "Creates or overwrites a file. By default, paths are resolved inside data/workspace/. Set inWorkspace to false to allow project-root-relative or absolute paths outside the workspace.",
     requiresApproval: true,
     schema: {
         type: "object",
         properties: {
             path: { type: "string", description: "File path (e.g. report.txt or subdir/file.py)" },
             content: { type: "string", description: "File content" },
+            inWorkspace: {
+                type: "boolean",
+                description: "Whether the path should stay inside data/workspace/. Default: true",
+            },
         },
         required: ["path", "content"],
     },
     execute(args) {
-        const { path: filePath, content } = args;
-        const absPath = filePath.startsWith("/") ? resolve(filePath) : resolve(WORKSPACE_DIR, filePath);
-        if (!absPath.startsWith(WORKSPACE_DIR + "/") && absPath !== WORKSPACE_DIR) {
-            return `Error: writes are only allowed inside data/workspace/. (requested: ${filePath})`;
-        }
+        const { path: filePath, content, inWorkspace = true } = args;
+        const { absPath, error } = resolveManagedPath(filePath, inWorkspace);
+        if (error) return error;
         const dir = resolve(absPath, "..");
         if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
         writeFileSync(absPath, content, "utf-8");
@@ -159,20 +180,23 @@ export const writeFile = {
 // 쓰기 도구: 파일 삭제 (data/workspace/ 한정)
 export const deleteFile = {
     name: "delete_file",
-    description: "Deletes a file. Only files inside data/workspace/ can be deleted.",
+    description:
+        "Deletes a file. By default, only files inside data/workspace/ can be deleted. Set inWorkspace to false to allow project-root-relative or absolute paths outside the workspace.",
     requiresApproval: true,
     schema: {
         type: "object",
         properties: {
             path: { type: "string", description: "File path to delete" },
+            inWorkspace: {
+                type: "boolean",
+                description: "Whether the path should stay inside data/workspace/. Default: true",
+            },
         },
         required: ["path"],
     },
     execute(args) {
-        const absPath = args.path.startsWith("/") ? resolve(args.path) : resolve(WORKSPACE_DIR, args.path);
-        if (!absPath.startsWith(WORKSPACE_DIR + "/") && absPath !== WORKSPACE_DIR) {
-            return `Error: deletes are only allowed inside data/workspace/. (requested: ${args.path})`;
-        }
+        const { absPath, error } = resolveManagedPath(args.path, args.inWorkspace ?? true);
+        if (error) return error;
         if (!existsSync(absPath)) return `File not found: ${args.path}`;
         unlinkSync(absPath);
         return `File deleted: ${absPath}`;
