@@ -37,7 +37,7 @@ class SkillLoader {
         const dir = skillsDir || resolve(process.cwd(), "src", "skills");
 
         if (!existsSync(dir)) {
-            logger.warn(`스킬 디렉토리 없음: ${dir}`);
+            logger.warn(`Skills directory not found: ${dir}`);
             return;
         }
 
@@ -48,7 +48,7 @@ class SkillLoader {
 
             const skillMdPath = join(dir, entry.name, "SKILL.md");
             if (!existsSync(skillMdPath)) {
-                logger.debug(`SKILL.md 없음 (스킵): ${skillMdPath}`);
+                logger.debug(`SKILL.md not found (skipped): ${skillMdPath}`);
                 continue;
             }
 
@@ -57,9 +57,9 @@ class SkillLoader {
                 const { meta, body } = parseFrontmatter(rawContent);
                 const name = meta.name || entry.name;
                 this.skills.set(name, { meta, body, rawContent });
-                logger.info(`스킬 로드 완료: ${name} [${skillMdPath}]`);
+                logger.info(`Skill loaded: ${name} [${skillMdPath}]`);
             } catch (err) {
-                logger.error(`스킬 로드 실패: ${entry.name}`, err);
+                logger.error(`Failed to load skill: ${entry.name}`, err);
             }
         }
     }
@@ -88,9 +88,9 @@ class SkillLoader {
 
         const sections = [];
         for (const [name, skill] of this.skills) {
-            sections.push(`## 스킬: ${name}\n${skill.body}`);
+            sections.push(`## Skill: ${name}\n${skill.body}`);
         }
-        return `\n\n---\n# 사용 가능한 스킬\n\n${sections.join("\n\n---\n\n")}`;
+        return `\n\n---\n# Available Skills\n\n${sections.join("\n\n---\n\n")}`;
     }
 }
 

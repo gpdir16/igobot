@@ -17,13 +17,13 @@ function resolveSource(filePath, fileName = "") {
 // 사용자에게 사진 파일 전송 (context.bot 필요)
 export const sendPhoto = {
     name: "send_photo",
-    description: "이미지 파일 또는 URL을 사용자에게 텔레그램 사진으로 전송합니다.",
+    description: "Sends an image file or URL to the user as a Telegram photo.",
     requiresApproval: false,
     schema: {
         type: "object",
         properties: {
-            path: { type: "string", description: "전송할 이미지 파일 경로 (절대 경로, data/workspace/ 기준 상대 경로, 또는 HTTP URL)" },
-            caption: { type: "string", description: "사진 설명 (선택)" },
+            path: { type: "string", description: "Image file path (absolute, data/workspace/-relative, or HTTP URL)" },
+            caption: { type: "string", description: "Photo caption (optional)" },
         },
         required: ["path"],
     },
@@ -31,20 +31,20 @@ export const sendPhoto = {
         const { path: filePath, caption = "" } = args;
         const { chatId, bot } = context;
 
-        if (!bot) return "오류: 봇 인스턴스가 없습니다.";
-        if (!chatId) return "오류: chatId가 없습니다.";
+        if (!bot) return "Error: bot instance not available.";
+        if (!chatId) return "Error: chatId not available.";
 
         const src = resolveSource(filePath);
 
         if (src.type === "local" && !existsSync(src.value)) {
-            return `파일을 찾을 수 없습니다: ${src.value}`;
+            return `File not found: ${src.value}`;
         }
 
         try {
             await bot.sendPhoto(chatId, src.value, caption);
-            return `사진 전송 완료: ${filePath}`;
+            return `Photo sent: ${filePath}`;
         } catch (err) {
-            return `사진 전송 실패: ${err.message}`;
+            return `Failed to send photo: ${err.message}`;
         }
     },
 };
@@ -52,13 +52,13 @@ export const sendPhoto = {
 // 사용자에게 문서/파일 전송
 export const sendDocument = {
     name: "send_document",
-    description: "파일 또는 URL을 사용자에게 텔레그램 문서로 전송합니다. 모든 파일 형식 지원.",
+    description: "Sends a file or URL to the user as a Telegram document. Supports all file types.",
     requiresApproval: false,
     schema: {
         type: "object",
         properties: {
-            path: { type: "string", description: "전송할 파일 경로 (절대 경로, data/workspace/ 기준 상대 경로, 또는 HTTP URL)" },
-            caption: { type: "string", description: "파일 설명 (선택)" },
+            path: { type: "string", description: "File path (absolute, data/workspace/-relative, or HTTP URL)" },
+            caption: { type: "string", description: "File caption (optional)" },
         },
         required: ["path"],
     },
@@ -66,21 +66,21 @@ export const sendDocument = {
         const { path: filePath, caption = "" } = args;
         const { chatId, bot } = context;
 
-        if (!bot) return "오류: 봇 인스턴스가 없습니다.";
-        if (!chatId) return "오류: chatId가 없습니다.";
+        if (!bot) return "Error: bot instance not available.";
+        if (!chatId) return "Error: chatId not available.";
 
         const src = resolveSource(filePath);
 
         if (src.type === "local" && !existsSync(src.value)) {
-            return `파일을 찾을 수 없습니다: ${src.value}`;
+            return `File not found: ${src.value}`;
         }
 
         const fileName = src.type === "local" ? src.value.split("/").pop() : filePath.split("/").pop();
         try {
             await bot.sendDocument(chatId, src.value, fileName, caption);
-            return `문서 전송 완료: ${filePath}`;
+            return `Document sent: ${filePath}`;
         } catch (err) {
-            return `문서 전송 실패: ${err.message}`;
+            return `Failed to send document: ${err.message}`;
         }
     },
 };

@@ -10,21 +10,21 @@ if (!existsSync(WORKSPACE_DIR)) mkdirSync(WORKSPACE_DIR, { recursive: true });
 // 읽기 도구: 파일 내용 읽기
 export const readFile = {
     name: "read_file",
-    description: "파일의 내용을 읽어 반환합니다. 경로와 선택적으로 줄 범위를 지정할 수 있습니다.",
+    description: "Reads and returns the contents of a file. Optionally specify a line range.",
     requiresApproval: false,
     schema: {
         type: "object",
         properties: {
-            path: { type: "string", description: "파일 경로" },
-            startLine: { type: "number", description: "시작 줄 번호 (1부터, 선택)" },
-            endLine: { type: "number", description: "끝 줄 번호 (포함, 선택)" },
+            path: { type: "string", description: "File path" },
+            startLine: { type: "number", description: "Start line number (1-based, optional)" },
+            endLine: { type: "number", description: "End line number (inclusive, optional)" },
         },
         required: ["path"],
     },
     execute(args) {
         const { path: filePath, startLine, endLine } = args;
         const absPath = resolve(filePath);
-        if (!existsSync(absPath)) return `파일을 찾을 수 없습니다: ${filePath}`;
+        if (!existsSync(absPath)) return `File not found: ${filePath}`;
         let content = readFileSync(absPath, "utf-8");
         if (startLine || endLine) {
             const lines = content.split("\n");
@@ -33,7 +33,7 @@ export const readFile = {
             content = lines.slice(start, end).join("\n");
         }
         if (content.length > 15000) {
-            content = content.slice(0, 7000) + "\n\n... [내용 생략] ...\n\n" + content.slice(-5000);
+            content = content.slice(0, 7000) + "\n\n... [content truncated] ...\n\n" + content.slice(-5000);
         }
         return content;
     },
@@ -42,20 +42,20 @@ export const readFile = {
 // 읽기 도구: 디렉토리 내용 목록
 export const listDir = {
     name: "list_directory",
-    description: "디렉토리의 파일과 폴더 목록을 반환합니다.",
+    description: "Returns the list of files and folders in a directory.",
     requiresApproval: false,
     schema: {
         type: "object",
         properties: {
-            path: { type: "string", description: "디렉토리 경로" },
-            recursive: { type: "boolean", description: "하위 디렉토리까지 포함 (선택, 기본값: false)" },
+            path: { type: "string", description: "Directory path" },
+            recursive: { type: "boolean", description: "Include subdirectories (optional, default: false)" },
         },
         required: ["path"],
     },
     execute(args) {
         const { path: dirPath, recursive = false } = args;
         const absPath = resolve(dirPath);
-        if (!existsSync(absPath)) return `디렉토리를 찾을 수 없습니다: ${dirPath}`;
+        if (!existsSync(absPath)) return `Directory not found: ${dirPath}`;
 
         const entries = [];
         function walk(dir, depth = 0) {
@@ -71,21 +71,21 @@ export const listDir = {
             }
         }
         walk(absPath);
-        return entries.join("\n") || "(빈 디렉토리)";
+        return entries.join("\n") || "(empty directory)";
     },
 };
 
 // 읽기 도구: 텍스트 검색
 export const searchFiles = {
     name: "search_files",
-    description: "파일들에서 텍스트 패턴을 검색합니다.",
+    description: "Searches for a text pattern across files in a directory.",
     requiresApproval: false,
     schema: {
         type: "object",
         properties: {
-            pattern: { type: "string", description: "검색할 텍스트 또는 정규식" },
-            path: { type: "string", description: "검색 디렉토리 (선택, 기본값: 현재)" },
-            filePattern: { type: "string", description: "파일 확장자 필터 (예: .js, .py)" },
+            pattern: { type: "string", description: "Text or regex pattern to search for" },
+            path: { type: "string", description: "Search directory (optional, defaults to current)" },
+            filePattern: { type: "string", description: "File extension filter (e.g. .js, .py)" },
         },
         required: ["pattern"],
     },
@@ -125,7 +125,7 @@ export const searchFiles = {
             }
         }
         walk(absPath);
-        return results.join("\n") || "검색 결과 없음";
+        return results.join("\n") || "No results found.";
     },
 };
 
@@ -133,13 +133,13 @@ export const searchFiles = {
 export const writeFile = {
     name: "write_file",
     description:
-        "파일을 생성하거나 내용을 덮어씁니다. data/workspace/ 내의 경로만 허용됩니다. 상대 경로 사용 시 data/workspace/ 기준으로 해석됩니다.",
+        "Creates or overwrites a file. Only paths inside data/workspace/ are allowed. Relative paths are resolved from data/workspace/.",
     requiresApproval: true,
     schema: {
         type: "object",
         properties: {
-            path: { type: "string", description: "파일 경로 (예: report.txt 또는 subdir/file.py)" },
-            content: { type: "string", description: "파일 내용" },
+            path: { type: "string", description: "File path (e.g. report.txt or subdir/file.py)" },
+            content: { type: "string", description: "File content" },
         },
         required: ["path", "content"],
     },
@@ -147,35 +147,35 @@ export const writeFile = {
         const { path: filePath, content } = args;
         const absPath = filePath.startsWith("/") ? resolve(filePath) : resolve(WORKSPACE_DIR, filePath);
         if (!absPath.startsWith(WORKSPACE_DIR + "/") && absPath !== WORKSPACE_DIR) {
-            return `오류: 쓰기 작업은 data/workspace/ 내에서만 가능합니다. (요청 경로: ${filePath})`;
+            return `Error: writes are only allowed inside data/workspace/. (requested: ${filePath})`;
         }
         const dir = resolve(absPath, "..");
         if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
         writeFileSync(absPath, content, "utf-8");
-        return `파일 작성 완료: ${absPath}`;
+        return `File written: ${absPath}`;
     },
 };
 
 // 쓰기 도구: 파일 삭제 (data/workspace/ 한정)
 export const deleteFile = {
     name: "delete_file",
-    description: "파일을 삭제합니다. data/workspace/ 내의 파일만 삭제 가능합니다.",
+    description: "Deletes a file. Only files inside data/workspace/ can be deleted.",
     requiresApproval: true,
     schema: {
         type: "object",
         properties: {
-            path: { type: "string", description: "삭제할 파일 경로" },
+            path: { type: "string", description: "File path to delete" },
         },
         required: ["path"],
     },
     execute(args) {
         const absPath = args.path.startsWith("/") ? resolve(args.path) : resolve(WORKSPACE_DIR, args.path);
         if (!absPath.startsWith(WORKSPACE_DIR + "/") && absPath !== WORKSPACE_DIR) {
-            return `오류: 삭제 작업은 data/workspace/ 내에서만 가능합니다. (요청 경로: ${args.path})`;
+            return `Error: deletes are only allowed inside data/workspace/. (requested: ${args.path})`;
         }
-        if (!existsSync(absPath)) return `파일이 존재하지 않습니다: ${args.path}`;
+        if (!existsSync(absPath)) return `File not found: ${args.path}`;
         unlinkSync(absPath);
-        return `파일 삭제 완료: ${absPath}`;
+        return `File deleted: ${absPath}`;
     },
 };
 

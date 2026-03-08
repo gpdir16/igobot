@@ -16,18 +16,18 @@ async function ensureFirefoxInstalled() {
     // 실제 파일 존재 여부 확인
     const firefoxPath = _playwright.firefox.executablePath();
     if (existsSync(firefoxPath)) {
-        logger.debug(`Firefox 이미 설치됨: ${firefoxPath}`);
+        logger.debug(`Firefox already installed: ${firefoxPath}`);
         return;
     }
 
     // 파일이 없으면 설치
-    logger.info("Firefox(Playwright) 미설치 — 자동 설치 중...");
+    logger.info("Firefox (Playwright) not found — installing...");
     try {
         execSync("npx playwright install firefox", { stdio: "inherit" });
-        logger.info("Firefox 설치 완료");
+        logger.info("Firefox installed.");
     } catch (err) {
-        logger.error("Firefox 설치 실패:", err.message);
-        throw new Error("Playwright Firefox를 설치할 수 없습니다. 'npx playwright install firefox'를 수동으로 실행해주세요.");
+        logger.error("Firefox installation failed:", err.message);
+        throw new Error("Could not install Playwright Firefox. Run 'npx playwright install firefox' manually.");
     }
 }
 
@@ -39,7 +39,7 @@ async function getBrowser() {
 
     _browser = await _playwright.firefox.launch();
 
-    logger.info("Firefox 브라우저 시작됨");
+    logger.info("Firefox browser started.");
     return _browser;
 }
 
@@ -61,7 +61,7 @@ async function getSession(sessionId = "default") {
     const page = await context.newPage();
     const session = { context, page };
     _sessions.set(sessionId, session);
-    logger.info(`새 브라우저 세션 생성: ${sessionId}`);
+    logger.info(`New browser session created: ${sessionId}`);
     return session;
 }
 
@@ -74,7 +74,7 @@ async function closeBrowser() {
     if (_browser) {
         await _browser.close();
         _browser = null;
-        logger.info("브라우저 종료됨");
+        logger.info("Browser closed.");
     }
 }
 
@@ -86,15 +86,15 @@ process.on("exit", () => {
 // 브라우저 도구: 웹페이지 열기 및 내용 가져오기
 export const browseFetch = {
     name: "browser_fetch",
-    description: "웹페이지를 열고 텍스트 내용을 가져옵니다. sessionId를 지정하면 쿠키/로그인 상태 등 세션이 유지됩니다.",
+    description: "Opens a webpage and returns its text content. Specify sessionId to preserve cookies/login state across calls.",
     requiresApproval: false,
     schema: {
         type: "object",
         properties: {
-            url: { type: "string", description: "접속할 URL" },
-            waitFor: { type: "string", description: "대기할 CSS 선택자 (선택)" },
-            timeout: { type: "number", description: "타임아웃(ms) (선택, 기본값: 15000)" },
-            sessionId: { type: "string", description: "세션 ID (선택, 기본값: 'default'). 동일 세션으로 쿠키/로그인 상태 유지" },
+            url: { type: "string", description: "URL to navigate to" },
+            waitFor: { type: "string", description: "CSS selector to wait for (optional)" },
+            timeout: { type: "number", description: "Timeout in ms (optional, default: 15000)" },
+            sessionId: { type: "string", description: "Session ID (optional, default: 'default'). Use the same session to keep cookies/login state." },
         },
         required: ["url"],
     },
@@ -115,13 +115,13 @@ export const browseFetch = {
                 return document.body?.innerText || "";
             });
 
-            let content = `제목: ${title}\nURL: ${url}\n세션: ${sessionId}\n\n${text}`;
+            let content = `Title: ${title}\nURL: ${url}\nSession: ${sessionId}\n\n${text}`;
             if (content.length > 15000) {
-                content = content.slice(0, 7000) + "\n\n... [내용 생략] ...\n\n" + content.slice(-5000);
+                content = content.slice(0, 7000) + "\n\n... [content truncated] ...\n\n" + content.slice(-5000);
             }
             return content;
         } catch (err) {
-            return `페이지 로드 실패: ${err.message}`;
+            return `Page load failed: ${err.message}`;
         }
     },
 };
@@ -129,26 +129,26 @@ export const browseFetch = {
 // 브라우저 도구: 페이지 인터랙션 (클릭, 입력 등)
 export const browserInteract = {
     name: "browser_interact",
-    description: "웹페이지에서 클릭, 텍스트 입력 등의 인터랙션을 수행합니다. sessionId로 로그인 세션 유지 가능.",
+    description: "Performs interactions on a webpage such as clicking, typing, or selecting. Use sessionId to maintain login sessions.",
     requiresApproval: true,
     schema: {
         type: "object",
         properties: {
-            url: { type: "string", description: "접속할 URL (현재 페이지 유지 시 생략 가능)" },
+            url: { type: "string", description: "URL to navigate to (omit to stay on current page)" },
             actions: {
                 type: "array",
-                description: "수행할 액션 목록",
+                description: "List of actions to perform",
                 items: {
                     type: "object",
                     properties: {
-                        action: { type: "string", enum: ["click", "fill", "select", "wait", "evaluate"], description: "액션 종류" },
-                        selector: { type: "string", description: "CSS 선택자" },
-                        value: { type: "string", description: "입력값 또는 JavaScript 코드" },
+                        action: { type: "string", enum: ["click", "fill", "select", "wait", "evaluate"], description: "Action type" },
+                        selector: { type: "string", description: "CSS selector" },
+                        value: { type: "string", description: "Input value or JavaScript code" },
                     },
                     required: ["action"],
                 },
             },
-            sessionId: { type: "string", description: "세션 ID (선택, 기본값: 'default'). 쿠키/로그인 상태 유지" },
+            sessionId: { type: "string", description: "Session ID (optional, default: 'default'). Preserves cookies/login state." },
         },
         required: ["actions"],
     },
@@ -166,34 +166,34 @@ export const browserInteract = {
                 switch (act.action) {
                     case "click":
                         await page.click(act.selector);
-                        results.push(`클릭: ${act.selector}`);
+                        results.push(`Clicked: ${act.selector}`);
                         break;
                     case "fill":
                         await page.fill(act.selector, act.value || "");
-                        results.push(`입력: ${act.selector} = "${act.value}"`);
+                        results.push(`Filled: ${act.selector} = "${act.value}"`);
                         break;
                     case "select":
                         await page.selectOption(act.selector, act.value);
-                        results.push(`선택: ${act.selector} = "${act.value}"`);
+                        results.push(`Selected: ${act.selector} = "${act.value}"`);
                         break;
                     case "wait":
                         await page.waitForSelector(act.selector, { timeout: 10000 });
-                        results.push(`대기 완료: ${act.selector}`);
+                        results.push(`Waited for: ${act.selector}`);
                         break;
                     case "evaluate": {
                         const evalResult = await page.evaluate(act.value);
-                        results.push(`실행 결과: ${JSON.stringify(evalResult)}`);
+                        results.push(`Evaluated: ${JSON.stringify(evalResult)}`);
                         break;
                     }
                 }
             }
 
             const finalText = await page.evaluate(() => document.body?.innerText?.slice(0, 3000) || "");
-            results.push(`\n최종 페이지 내용:\n${finalText}`);
+            results.push(`\nFinal page content:\n${finalText}`);
 
             return results.join("\n");
         } catch (err) {
-            return `인터랙션 실패: ${err.message}\n수행된 액션:\n${results.join("\n")}`;
+            return `Interaction failed: ${err.message}\nCompleted actions:\n${results.join("\n")}`;
         }
     },
 };

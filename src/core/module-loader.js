@@ -24,14 +24,14 @@ class ModuleLoader {
 
                 for (const tool of toolList) {
                     if (!tool?.name || !tool?.execute) {
-                        logger.warn(`도구 모듈 ${file}에 유효하지 않은 도구가 있습니다. 건너뜁니다.`);
+                        logger.warn(`Invalid tool in ${file} — skipped.`);
                         continue;
                     }
                     this.tools.set(tool.name, tool);
-                    logger.info(`도구 로드 완료: ${tool.name} (${file})`);
+                    logger.info(`Tool loaded: ${tool.name} (${file})`);
                 }
             } catch (err) {
-                logger.error(`도구 로드 실패: ${file}`, err);
+                logger.error(`Failed to load tool: ${file}`, err);
             }
         }
     }
@@ -54,7 +54,7 @@ class ModuleLoader {
     // 도구 실행
     async executeTool(name, args, context = {}) {
         const tool = this.getTool(name);
-        if (!tool) throw new Error(`알 수 없는 도구: ${name}`);
+        if (!tool) throw new Error(`Unknown tool: ${name}`);
         return tool.execute(args, context);
     }
 }
