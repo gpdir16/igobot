@@ -616,6 +616,11 @@ trap cleanup EXIT
 
 # 메인
 main() {
+    # curl | bash 로 실행될 때
+    if [ ! -t 0 ]; then
+        exec < /dev/tty
+    fi
+
     if [ "$1" = "--uninstall" ]; then
         LANG_CODE="en"
         do_uninstall
