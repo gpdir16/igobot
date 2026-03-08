@@ -11,6 +11,12 @@ BIN_DIR="/usr/local/bin"
 NODE_MAJOR=20
 LANG_CODE="en"
 ENV_BACKUP=""
+INTERACTIVE_INPUT="/dev/stdin"
+
+# curl | bash 로 실행되면 stdin이 파이프이므로, 사용자 입력만 실제 터미널에서 받는다.
+if [ -r /dev/tty ]; then
+    INTERACTIVE_INPUT="/dev/tty"
+fi
 
 # 색상
 RED=$(tput setaf 1 2>/dev/null || echo "")
@@ -130,6 +136,14 @@ OS=$(detect_os)
 
 has() {
     command -v "$1" >/dev/null 2>&1
+}
+
+read_interactive() {
+    IFS= read "$@" < "$INTERACTIVE_INPUT"
+}
+
+run_with_interactive_stdin() {
+    "$@" < "$INTERACTIVE_INPUT"
 }
 
 get_git_version() {
@@ -277,10 +291,10 @@ show_menu() {
         echo "  ${YELLOW}$(txt navigate)${RESET}"
         show_footer
 
-        IFS= read -rsn1 key
+        read_interactive -rsn1 key
         case "$key" in
             $'\x1b')
-                read -rsn2 -t1 key
+                read_interactive -rsn2 -t1 key
                 case "$key" in
                     '[A') ((selected--)); [ $selected -lt 0 ] && selected=$((count - 1)) ;;
                     '[B') ((selected++)); [ $selected -ge $count ] && selected=0 ;;
@@ -316,10 +330,10 @@ show_confirm() {
         echo "  ${YELLOW}$(txt navigate)${RESET}"
         show_footer
 
-        IFS= read -rsn1 key
+        read_interactive -rsn1 key
         case "$key" in
             $'\x1b')
-                read -rsn2 -t1 key
+                read_interactive -rsn2 -t1 key
                 case "$key" in
                     '[A'|'[D'|'[B'|'[C') selected=$((1 - selected)) ;;
                 esac
@@ -384,7 +398,7 @@ show_error() {
     echo "  ${YELLOW}$(txt continue)${RESET}"
     show_footer
 
-    read -rsn1
+    read_interactive -rsn1
     restore_screen
     exit 1
 }
@@ -499,7 +513,7 @@ check_existing() {
             echo ""
             echo "  ${YELLOW}$(txt continue)${RESET}"
             show_footer
-            read -rsn1
+            read_interactive -rsn1
             restore_screen
             exit 0
         fi
@@ -606,7 +620,7 @@ do_uninstall() {
     echo "  ${GREEN}$(txt uninstall_done)${RESET}"
 
     show_footer
-    read -rsn1
+    read_interactive -rsn1
     restore_screen
     exit 0
 }
@@ -636,7 +650,7 @@ main() {
     echo ""
     echo "  ${YELLOW}$(txt continue)${RESET}"
     show_footer
-    read -rsn1
+    read_interactive -rsn1
 
     # 설치 과정
     check_existing
@@ -648,7 +662,7 @@ main() {
     install_global
     setup_config
     show_complete
-    igobot setup
+    run_with_interactive_stdin igobot setup
 }
 
 main "$@"
