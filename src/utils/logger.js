@@ -1,4 +1,7 @@
 import { createLogger, format, transports } from "winston";
+import { APP_LOG_FILE, ensureLogDir } from "../core/log-paths.js";
+
+ensureLogDir();
 
 const logger = createLogger({
     level: process.env.LOG_LEVEL || "info",
@@ -18,7 +21,7 @@ const logger = createLogger({
                 }),
             ),
         }),
-        new transports.File({ filename: "igobot.log", maxsize: 5242880, maxFiles: 3 }),
+        new transports.File({ filename: APP_LOG_FILE, maxsize: 5242880, maxFiles: 3 }),
     ],
 });
 

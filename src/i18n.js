@@ -37,19 +37,20 @@ const translations = {
 
         // 텔레그램 설정
         telegram: {
-            token_new: "[1/4] Enter your Telegram bot token (get it from @BotFather)",
-            token_existing: "[1/4] Enter your Telegram bot token from @BotFather (press Enter to keep the current value)",
+            token_new: "[1/3] Enter your Telegram bot token (get it from @BotFather)",
+            token_existing: "[1/3] Enter your Telegram bot token from @BotFather (press Enter to keep the current value)",
             token_required: "Bot token is required.",
             token_invalid: "Invalid bot token format. (e.g. 123456789:ABC...)",
-            users: "[2/4] Allowed Telegram user IDs (comma-separated)",
-            users_placeholder: "123456789,987654321",
-            users_required: "User ID is required. (Find it in Telegram Web URL)",
-            users_invalid: "Enter numbers and commas only. (e.g. 123456789)",
+            approval_flow_title: "Telegram Access",
+            approval_flow:
+                "Allowed users are no longer pre-registered in setup.\n" +
+                "When a new Telegram account sends a message, igobot creates a unique approval code.\n" +
+                "Approve that account from this machine with: igobot ok {code}",
         },
 
         // 에이전트 설정 (온보딩용 — 런타임 agent.*와 구분)
         agent_setup: {
-            max_iter: "[3/4] Max agent iterations (LLM call limit per task)",
+            max_iter: "[2/3] Max agent iterations (LLM call limit per task)",
             max_iter_invalid: "Enter a number of 1 or more.",
             max_iter_too_large: "Too large. Recommended range: 1–1000.",
             log_level: "Select log level",
@@ -69,8 +70,8 @@ const translations = {
 
         // Codex 로그인 (온보딩)
         login: {
-            confirm_existing: "[4/4] Codex auth already exists. Re-login?",
-            confirm_new: "[4/4] Proceed with Codex OAuth login? (ChatGPT Plus/Pro required)",
+            confirm_existing: "[3/3] Codex auth already exists. Re-login?",
+            confirm_new: "[3/3] Proceed with Codex OAuth login? (ChatGPT Plus/Pro required)",
             note_body:
                 "Open the URL in your browser and\n" +
                 "sign in with your ChatGPT account.\n\n" +
@@ -94,7 +95,6 @@ const translations = {
         // ── 봇 런타임 메시지 ──────────────────────────────────────────────
         bot: {
             token_missing: "TELEGRAM_BOT_TOKEN is not set.",
-            access_denied: "⛔ Access denied.",
             start:
                 "<b>🤖 igobot</b> activated\n\n" +
                 "Send a message and the AI agent will respond.\n" +
@@ -108,6 +108,18 @@ const translations = {
             yolo_on: "🚀 YOLO mode ON",
             denied: "❌ Denied",
             error: "⚠️ Error: {msg}",
+            auth_pending_short: "Approval is still required for this Telegram account.",
+            auth_request_message:
+                "<b>🔐 Approval is required for this account for security.</b>\n\n" +
+                "This looks like a Telegram account igobot has not seen before.\n" +
+                "For security, approval is required before using igobot.\n\n" +
+                "Run the command below in the terminal on the computer where igobot is running:\n" +
+                "<code>igobot ok {code}</code>\n\n" +
+                "After approval, you can chat, work, and build with igobot.",
+            auth_approved:
+                "<b>✅ This account has been approved.</b>\n\n" +
+                "You are ready to chat with igobot.\n" +
+                "Send any message to start.",
             photo: "[Photo]",
             document: "[Document: {name}]",
             sticker: "[Sticker: {emoji}]",
@@ -158,6 +170,12 @@ const translations = {
         // ── CLI 메시지 ────────────────────────────────────────────────────
         cli: {
             first_run: "\nFirst run detected. Starting setup...\n",
+            approve_usage: "Usage: igobot ok <approval-code>",
+            approve_not_found: "No pending Telegram approval was found for code: {code}",
+            approve_already_done: "This approval code was already used: {code}",
+            approve_success: "Approved Telegram account: {account} (userId: {userId})",
+            approve_success_next: "This account can now send messages to igobot.",
+            approve_notify_failed: "Approval succeeded, but the Telegram confirmation message could not be sent.",
         },
 
         // ── 시스템 프롬프트 (LLM 지시문) ─────────────────────────────────
@@ -228,19 +246,20 @@ Web scraping rules:
 
         // 텔레그램 설정
         telegram: {
-            token_new: "[1/4] @BotFather에서 발급한 Telegram 봇 토큰을 입력하세요",
-            token_existing: "[1/4] @BotFather에서 발급한 Telegram 봇 토큰을 입력하세요 (Enter로 기존 값 유지)",
+            token_new: "[1/3] @BotFather에서 발급한 Telegram 봇 토큰을 입력하세요",
+            token_existing: "[1/3] @BotFather에서 발급한 Telegram 봇 토큰을 입력하세요 (Enter로 기존 값 유지)",
             token_required: "봇 토큰은 필수입니다.",
             token_invalid: "올바르지 않은 봇 토큰 형식입니다. (예: 123456789:ABC...)",
-            users: "[2/4] 허용할 텔레그램 사용자 ID (쉼표로 구분)",
-            users_placeholder: "123456789,987654321",
-            users_required: "사용자 ID는 필수입니다. (텔레그램 웹 주소창에서 확인)",
-            users_invalid: "숫자와 쉼표만 입력하세요. (예: 123456789)",
+            approval_flow_title: "텔레그램 접근 승인",
+            approval_flow:
+                "이제 허용 사용자 ID를 setup에서 미리 등록하지 않습니다.\n" +
+                "새 텔레그램 계정이 메시지를 보내면 igobot이 고유 승인 코드를 발급합니다.\n" +
+                "이 컴퓨터에서 `igobot ok {코드}`를 실행해 해당 계정을 승인하세요.",
         },
 
         // 에이전트 설정 (온보딩용)
         agent_setup: {
-            max_iter: "[3/4] 에이전트 최대 반복 횟수 (작업 하나당 LLM 호출 한도)",
+            max_iter: "[2/3] 에이전트 최대 반복 횟수 (작업 하나당 LLM 호출 한도)",
             max_iter_invalid: "1 이상의 숫자를 입력하세요.",
             max_iter_too_large: "너무 큰 값입니다. 1~1000 사이를 권장합니다.",
             log_level: "로그 레벨을 선택하세요",
@@ -260,8 +279,8 @@ Web scraping rules:
 
         // Codex 로그인 (온보딩)
         login: {
-            confirm_existing: "[4/4] Codex 인증이 이미 있습니다. 다시 로그인하시겠습니까?",
-            confirm_new: "[4/4] Codex OAuth 로그인을 진행하시겠습니까? (ChatGPT Plus/Pro 계정 필요)",
+            confirm_existing: "[3/3] Codex 인증이 이미 있습니다. 다시 로그인하시겠습니까?",
+            confirm_new: "[3/3] Codex OAuth 로그인을 진행하시겠습니까? (ChatGPT Plus/Pro 계정 필요)",
             note_body:
                 "브라우저에서 열리는 URL에 접속하여\n" +
                 "ChatGPT 계정으로 로그인해주세요.\n\n" +
@@ -285,7 +304,6 @@ Web scraping rules:
         // ── 봇 런타임 메시지 ──────────────────────────────────────────────
         bot: {
             token_missing: "TELEGRAM_BOT_TOKEN이 설정되지 않았습니다.",
-            access_denied: "⛔ 접근 권한이 없습니다.",
             start:
                 "<b>🤖 igobot</b> 활성화됨\n\n" +
                 "메시지를 보내면 AI 에이전트가 응답합니다.\n" +
@@ -299,6 +317,18 @@ Web scraping rules:
             yolo_on: "🚀 YOLO 모드 ON",
             denied: "❌ 거부됨",
             error: "⚠️ 오류: {msg}",
+            auth_pending_short: "이 텔레그램 계정은 아직 승인이 필요합니다.",
+            auth_request_message:
+                "<b>🔐 보안을 위해 이 계정에 대한 승인이 필요합니다.</b>\n\n" +
+                "이 계정은 처음 보는 계정인것 같습니다.\n" +
+                "보안을 위해 igobot을 이용하려면 승인이 필요합니다.\n\n" +
+                "igobot이 실행중인 컴퓨터의 터미널에 아래 명령어를 실행하세요:\n" +
+                "<code>igobot ok {code}</code>\n\n" +
+                "승인 후 igobot과 함께 대화하고, 작업하고, 개발할수 있습니다.",
+            auth_approved:
+                "<b>✅ 이 계정이 승인되었습니다.</b>\n\n" +
+                "igobot과 함께 대화할 준비가 되었습니다.\n" +
+                "아무 메시지나 보내서 시작하세요.",
             photo: "[사진]",
             document: "[문서: {name}]",
             sticker: "[스티커: {emoji}]",
@@ -349,6 +379,12 @@ Web scraping rules:
         // ── CLI 메시지 ────────────────────────────────────────────────────
         cli: {
             first_run: "\n첫 실행입니다. 설정을 시작합니다...\n",
+            approve_usage: "사용법: igobot ok <인증코드>",
+            approve_not_found: "해당 코드의 대기 중인 텔레그램 승인 요청이 없습니다: {code}",
+            approve_already_done: "이미 사용된 승인 코드입니다: {code}",
+            approve_success: "텔레그램 계정을 승인했습니다: {account} (userId: {userId})",
+            approve_success_next: "이제 이 계정이 igobot에 메시지를 보낼 수 있습니다.",
+            approve_notify_failed: "승인은 완료됐지만 텔레그램 확인 메시지 전송에는 실패했습니다.",
         },
 
         // ── 시스템 프롬프트 (LLM 지시문) ─────────────────────────────────
@@ -394,7 +430,7 @@ Web scraping rules:
 };
 
 // ── t() 함수 생성 ─────────────────────────────────────────────────────────────
-// 점 표기법으로 중첩 키 접근: t('bot.access_denied')
+// 점 표기법으로 중첩 키 접근: t('bot.error')
 // 보간 지원: t('bot.error', { msg: '...' }) → {msg} 치환
 // 폴백 순서: 선택 언어 → 영어(기본) → 키 그대로 반환
 export function createT(lang) {

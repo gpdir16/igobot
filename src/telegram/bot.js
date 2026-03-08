@@ -2,6 +2,7 @@ import { Telegraf, Markup } from "telegraf";
 import { createReadStream, existsSync, writeFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import config from "../core/config.js";
+import { createTelegramAccessRequest } from "../core/telegram-auth-store.js";
 import logger from "../utils/logger.js";
 import { markdownToTelegramHtml, escapeHtml, splitAndConvert } from "../utils/markdown.js";
 import { getT } from "../i18n.js";
@@ -22,24 +23,46 @@ class TelegramBot {
 
         this.bot = new Telegraf(token);
         this.onMessage = messageHandler;
-        const allowedUsers = config.telegram.allowedUsers;
 
         // 사용자 인증 미들웨어
-        this.bot.use((ctx, next) => {
-            // from 없는 서비스 메시지 통과
+        this.bot.use(async (ctx, next) => {
             if (!ctx.from) return next();
-            // 봇 자신이 from인 경우 통과 (pin 알림 등 서비스 메시지)
             if (ctx.from.is_bot) return next();
-            const userId = String(ctx.from.id);
-            if (allowedUsers.length > 0 && !allowedUsers.includes(userId)) {
-                logger.warn(`Unauthorized access attempt: ${userId} (${ctx.from?.username})`);
-                // 메시지가 있을 때만 접근 거부 응답
-                if (ctx.message || ctx.callbackQuery) {
-                    return ctx.reply(getT()("bot.access_denied"));
-                }
+
+            const access = createTelegramAccessRequest({
+                userId: ctx.from.id,
+                chatId: ctx.chat?.id ?? ctx.from.id,
+                username: ctx.from.username,
+                firstName: ctx.from.first_name,
+                lastName: ctx.from.last_name,
+            });
+
+            if (access.status === "authorized") {
+                return next();
+            }
+
+            if (access.isNew) {
+                logger.info(
+                    `Telegram access request created: ${ctx.from.id} (${ctx.from.username || "no_username"}) code=${access.request.code}`,
+                );
+            }
+
+            if (ctx.callbackQuery) {
+                try {
+                    await ctx.answerCbQuery(getT()("bot.auth_pending_short"), { show_alert: true });
+                } catch {}
                 return;
             }
-            return next();
+
+            if (ctx.chat?.id) {
+                try {
+                    await ctx.replyWithHTML(this.buildAccessRequestMessage(access.request));
+                } catch (err) {
+                    logger.warn(`Failed to send Telegram access request message: ${err.message}`);
+                }
+            }
+
+            return;
         });
 
         this.bot.start((ctx) => {
@@ -480,6 +503,11 @@ class TelegramBot {
             this.saveToolLogToFile(toolHistory);
         }
         return this.send(chatId, text);
+    }
+
+    buildAccessRequestMessage(request) {
+        const t = getT();
+        return t("bot.auth_request_message", { code: escapeHtml(request.code) });
     }
 }
 

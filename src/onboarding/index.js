@@ -14,14 +14,13 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { SUPPORTED_LANGUAGES, createT } from "../i18n.js";
+import { getCodexAuthFile } from "../core/auth-paths.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const ROOT = resolve(__dirname, "..", "..");
 
 const ENV_FILE = resolve(ROOT, ".env");
-const AUTH_FILE = resolve(ROOT, "auth.json");
-
 // ── 헬퍼: .env 파싱 ──────────────────────────────────────────────────────────
 function parseEnv(content) {
     const env = {};
@@ -44,9 +43,6 @@ function writeEnv(env) {
         "# Telegram bot token (from @BotFather)",
         `TELEGRAM_BOT_TOKEN=${env.TELEGRAM_BOT_TOKEN ?? ""}`,
         "",
-        "# Allowed Telegram user IDs (comma-separated)",
-        `TELEGRAM_ALLOWED_USERS=${env.TELEGRAM_ALLOWED_USERS ?? ""}`,
-        "",
         "# Agent settings",
         `AGENT_MAX_ITERATIONS=${env.AGENT_MAX_ITERATIONS ?? "100"}`,
         "",
@@ -63,7 +59,7 @@ function writeEnv(env) {
 export function needsOnboarding() {
     if (!existsSync(ENV_FILE)) return true;
     const env = parseEnv(readFileSync(ENV_FILE, "utf-8"));
-    return !env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_ALLOWED_USERS;
+    return !env.TELEGRAM_BOT_TOKEN;
 }
 
 // ── cancel 헬퍼: isCancel이면 메시지 출력 후 종료 ────────────────────────────
@@ -112,7 +108,7 @@ export async function runOnboarding({ isFirstRun = false } = {}) {
         );
     }
 
-    // ── [1/5] 텔레그램 봇 토큰 ───────────────────────────────────────────────
+    // ── [1/3] 텔레그램 봇 토큰 ───────────────────────────────────────────────
     const hasToken = !!existingEnv.TELEGRAM_BOT_TOKEN;
     const botToken = abortIfCancel(
         await password({
@@ -127,25 +123,9 @@ export async function runOnboarding({ isFirstRun = false } = {}) {
         t,
     );
 
-    // ── [2/5] 허용된 사용자 ID ────────────────────────────────────────────────
-    const allowedUsers = abortIfCancel(
-        await text({
-            message: t("telegram.users"),
-            placeholder: existingEnv.TELEGRAM_ALLOWED_USERS || t("telegram.users_placeholder"),
-            defaultValue: existingEnv.TELEGRAM_ALLOWED_USERS || "",
-            validate(value) {
-                if (!value && !existingEnv.TELEGRAM_ALLOWED_USERS) {
-                    return t("telegram.users_required");
-                }
-                if (value && !/^[\d,\s]+$/.test(value)) {
-                    return t("telegram.users_invalid");
-                }
-            },
-        }),
-        t,
-    );
+    note(t("telegram.approval_flow"), t("telegram.approval_flow_title"));
 
-    // ── [3/4] 에이전트 설정 ──────────────────────────────────────────────────
+    // ── [2/3] 에이전트 설정 ──────────────────────────────────────────────────
     const maxIterations = abortIfCancel(
         await text({
             message: t("agent_setup.max_iter"),
@@ -181,7 +161,6 @@ export async function runOnboarding({ isFirstRun = false } = {}) {
 
     writeEnv({
         TELEGRAM_BOT_TOKEN: botToken || existingEnv.TELEGRAM_BOT_TOKEN,
-        TELEGRAM_ALLOWED_USERS: allowedUsers || existingEnv.TELEGRAM_ALLOWED_USERS,
         AGENT_MAX_ITERATIONS: maxIterations,
         LOG_LEVEL: logLevel,
         LANGUAGE: langValue,
@@ -189,8 +168,8 @@ export async function runOnboarding({ isFirstRun = false } = {}) {
 
     s.stop(t("save.saved"));
 
-    // ── [5/5] Codex OAuth 로그인 ──────────────────────────────────────────────
-    const alreadyLoggedIn = existsSync(AUTH_FILE);
+    // ── [3/3] Codex OAuth 로그인 ──────────────────────────────────────────────
+    const alreadyLoggedIn = existsSync(getCodexAuthFile());
     const doLogin = abortIfCancel(
         await confirm({
             message: alreadyLoggedIn ? t("login.confirm_existing") : t("login.confirm_new"),

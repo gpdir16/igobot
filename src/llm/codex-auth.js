@@ -1,17 +1,15 @@
 import { randomBytes, createHash } from "node:crypto";
 import { createServer } from "node:http";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { resolve } from "node:path";
 import logger from "../utils/logger.js";
 import { getT } from "../i18n.js";
+import { ensureAuthDir, getCodexAuthFile } from "../core/auth-paths.js";
 
 const CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
 const AUTH_BASE = "https://auth.openai.com";
 const REDIRECT_PORT = 1455;
 const REDIRECT_URI = `http://localhost:${REDIRECT_PORT}/auth/callback`;
 const SCOPES = "openid profile email offline_access";
-const AUTH_FILE = resolve(process.cwd(), "auth.json");
-
 // PKCE code_verifier / code_challenge 생성
 function generatePKCE() {
     const verifier = randomBytes(64).toString("hex");
@@ -30,9 +28,10 @@ function decodeJwtPayload(token) {
 
 // 저장된 인증 정보 로드
 export function loadAuth() {
-    if (!existsSync(AUTH_FILE)) return null;
+    const authFile = getCodexAuthFile();
+    if (!existsSync(authFile)) return null;
     try {
-        return JSON.parse(readFileSync(AUTH_FILE, "utf-8"));
+        return JSON.parse(readFileSync(authFile, "utf-8"));
     } catch {
         return null;
     }
@@ -40,7 +39,8 @@ export function loadAuth() {
 
 // 인증 정보 저장
 function saveAuth(data) {
-    writeFileSync(AUTH_FILE, JSON.stringify(data, null, 2), "utf-8");
+    ensureAuthDir();
+    writeFileSync(getCodexAuthFile(), JSON.stringify(data, null, 2), "utf-8");
     logger.info("Credentials saved");
 }
 

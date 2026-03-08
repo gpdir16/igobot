@@ -1,7 +1,8 @@
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
+import { getCodexAuthFile } from "./auth-paths.js";
 
-// 앱 설정 로더 (.env + auth.json + model.json 통합)
+// 앱 설정 로더 (.env + data/auth/codex.json + model.json 통합)
 class Config {
     constructor() {
         this._cache = {};
@@ -9,8 +10,8 @@ class Config {
     }
 
     load() {
-        // auth.json에서 Codex 토큰 로드
-        const authPath = resolve(process.cwd(), "auth.json");
+        // data/auth/codex.json에서 Codex 토큰 로드
+        const authPath = getCodexAuthFile();
         if (existsSync(authPath)) {
             try {
                 const raw = readFileSync(authPath, "utf-8");
@@ -36,10 +37,6 @@ class Config {
     get telegram() {
         return {
             token: process.env.TELEGRAM_BOT_TOKEN,
-            allowedUsers: (process.env.TELEGRAM_ALLOWED_USERS || "")
-                .split(",")
-                .map((id) => id.trim())
-                .filter(Boolean),
         };
     }
 

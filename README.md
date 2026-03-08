@@ -50,7 +50,6 @@ cp -n .env.example .env
 
 ```env
 TELEGRAM_BOT_TOKEN=your_bot_token_here
-TELEGRAM_ALLOWED_USERS=your_telegram_user_id (텔레그램 웹에서 저장한 메시지 채팅방에들어가면 주소창에 뜨는 숫자)
 ```
 
 LLM 설정은 프로젝트 루트의 `model.json`에서 관리합니다:
@@ -72,7 +71,7 @@ npm run login
 ```
 
 브라우저에서 표시된 URL을 열고 ChatGPT 계정으로 로그인합니다.
-인증 정보는 `auth.json`에 저장됩니다.
+Codex 인증 정보는 `data/auth/codex.json`에 저장됩니다.
 
 ### 2. 봇 시작
 
@@ -83,6 +82,14 @@ npm start
 ### 3. 텔레그램에서 대화
 
 봇에게 메시지를 보내면 에이전트가 작업을 수행합니다.
+
+처음 보는 텔레그램 계정이 메시지를 보내면, 봇이 고유한 승인 코드를 안내합니다. 서버에서 아래 명령으로 해당 계정을 승인하세요:
+
+```bash
+igobot ok ABC12345
+```
+
+텔레그램 승인 정보와 대기 중인 요청은 `data/auth/telegram.json`에 저장됩니다.
 
 **명령어:**
 - `/start` — 봇 시작 안내

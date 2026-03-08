@@ -2,12 +2,13 @@
 
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import { CLI_LOG_FILE, ensureLogDir } from "../src/core/log-paths.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const PID_FILE = join(__dirname, "..", "data", "igobot.pid");
-const LOG_FILE = join(__dirname, "..", "logs", "igobot.log");
+const LOG_FILE = CLI_LOG_FILE;
 
 const command = process.argv[2];
 const args = process.argv.slice(3);
@@ -36,6 +37,9 @@ async function runCommand(cmd, args) {
             break;
         case "setup":
             await runSetup();
+            break;
+        case "ok":
+            await approveTelegramAccess(args);
             break;
         case "help":
         case "--help":
@@ -68,15 +72,17 @@ Commands:
   status    Check igobot status
   logs      View logs (default: last 50 lines)
             --follow, -f: Follow log output
+  ok        Approve a pending Telegram access code
   login     Codex OAuth login (unofficial)
   help      Show this help
 
 Examples:
-  igobot setup      # Configure igobot (run this first!)
-  igobot start      # Start in background
-  igobot status     # Check status
-  igobot logs -f    # Follow logs in real-time
-  igobot stop       # Stop the bot
+  igobot setup        # Configure igobot (run this first!)
+  igobot start        # Start in background
+  igobot ok ABC12345  # Approve a Telegram account
+  igobot status       # Check status
+  igobot logs -f      # Follow logs in real-time
+  igobot stop         # Stop the bot
 `);
 }
 
@@ -92,10 +98,7 @@ async function startBot() {
         }
     }
 
-    const logsDir = dirname(LOG_FILE);
-    if (!existsSync(logsDir)) {
-        mkdirSync(logsDir, { recursive: true });
-    }
+    ensureLogDir();
 
     const dataDir = dirname(PID_FILE);
     if (!existsSync(dataDir)) {
@@ -258,6 +261,73 @@ async function runSetup() {
     process.stdout.write("\x1b[?25h"); // 커서 강제 표시
     process.stdin.pause();
     process.exit(0);
+}
+
+async function approveTelegramAccess(args) {
+    await import("dotenv/config");
+    const { getT } = await import("../src/i18n.js");
+    const { approveTelegramAccessCode, formatTelegramAccountLabel } = await import("../src/core/telegram-auth-store.js");
+
+    const t = getT();
+    const code = args[0];
+
+    if (!code) {
+        console.error(t("cli.approve_usage"));
+        process.exit(1);
+    }
+
+    const result = approveTelegramAccessCode(code);
+
+    if (result.status === "invalid_code") {
+        console.error(t("cli.approve_usage"));
+        process.exit(1);
+    }
+
+    if (result.status === "not_found") {
+        console.error(t("cli.approve_not_found", { code }));
+        process.exit(1);
+    }
+
+    if (result.status === "already_approved") {
+        console.log(t("cli.approve_already_done", { code }));
+        return;
+    }
+
+    console.log(
+        t("cli.approve_success", {
+            account: formatTelegramAccountLabel(result.authorizedUser),
+            userId: result.authorizedUser.userId,
+        }),
+    );
+    console.log(t("cli.approve_success_next"));
+
+    const notified = await sendTelegramApprovalConfirmation(result.request);
+    if (!notified) {
+        console.warn(t("cli.approve_notify_failed"));
+    }
+}
+
+async function sendTelegramApprovalConfirmation(request) {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token || !request?.chatId) return false;
+
+    const { getT } = await import("../src/i18n.js");
+    const t = getT();
+
+    try {
+        const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+                chat_id: request.chatId,
+                text: t("bot.auth_approved"),
+                parse_mode: "HTML",
+            }),
+        });
+        return res.ok;
+    } catch {
+        return false;
+    }
 }
 
 async function checkFirstRun() {
