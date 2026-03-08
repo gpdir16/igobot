@@ -240,7 +240,10 @@ async function runSetup() {
 async function checkFirstRun() {
     const { needsOnboarding, runOnboarding } = await import("../src/onboarding/index.js");
     if (needsOnboarding()) {
-        console.log("\n첫 실행입니다. 설정을 시작합니다...\n");
+        // .env 로드 후 설정된 언어로 메시지 출력
+        await import("dotenv/config");
+        const { getT } = await import("../src/i18n.js");
+        console.log(getT()("cli.first_run"));
         await runOnboarding({ isFirstRun: true });
     }
 }

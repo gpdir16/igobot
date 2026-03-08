@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import logger from "../utils/logger.js";
+import { getT } from "../i18n.js";
 
 const CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
 const AUTH_BASE = "https://auth.openai.com";
@@ -22,7 +23,7 @@ function generatePKCE() {
 // JWT payload 디코딩 (서명 검증 없음)
 function decodeJwtPayload(token) {
     const parts = token.split(".");
-    if (parts.length < 2) throw new Error("올바르지 않은 JWT");
+    if (parts.length < 2) throw new Error(getT()("auth.invalid_jwt"));
     const payload = Buffer.from(parts[1], "base64url").toString("utf-8");
     return JSON.parse(payload);
 }
@@ -40,11 +41,12 @@ export function loadAuth() {
 // 인증 정보 저장
 function saveAuth(data) {
     writeFileSync(AUTH_FILE, JSON.stringify(data, null, 2), "utf-8");
-    logger.info("인증 정보 저장 완료");
+    logger.info("Credentials saved");
 }
 
 // OAuth 로그인 (PKCE Authorization Code Flow)
 export async function login() {
+    const t = getT();
     const { verifier, challenge } = generatePKCE();
     const state = randomBytes(16).toString("hex");
 
@@ -59,10 +61,10 @@ export async function login() {
     authUrl.searchParams.set("codex_cli_simplified_flow", "true");
     authUrl.searchParams.set("state", state);
 
-    console.log("\n===== igobot Codex OAuth 로그인 =====");
-    console.log("아래 URL을 브라우저에서 열어 ChatGPT 계정으로 로그인하세요:\n");
+    console.log(`\n${t("auth.login_header")}`);
+    console.log(t("auth.login_instruction") + "\n");
     console.log(authUrl.toString());
-    console.log("\n콜백 대기 중...\n");
+    console.log(`\n${t("auth.callback_waiting")}\n`);
 
     return new Promise((resolvePromise, reject) => {
         const server = createServer(async (req, res) => {
@@ -100,7 +102,7 @@ export async function login() {
 
                 if (!tokenRes.ok) {
                     const errBody = await tokenRes.text();
-                    throw new Error(`토큰 교환 실패: ${tokenRes.status} ${errBody}`);
+                    throw new Error(t("auth.token_exchange_failed", { status: tokenRes.status, body: errBody }));
                 }
 
                 const tokenData = await tokenRes.json();
@@ -122,10 +124,10 @@ export async function login() {
                 saveAuth(authData);
 
                 res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-                res.end("<h1>✅ igobot 인증 완료!</h1><p>이 창을 닫아도 됩니다.</p>");
+                res.end(t("auth.success_page"));
 
                 server.close();
-                logger.info(`로그인 성공 (account: ${accountId})`);
+                logger.info(`Login successful (account: ${accountId})`);
                 resolvePromise(authData);
             } catch (err) {
                 res.writeHead(500);
@@ -136,14 +138,14 @@ export async function login() {
         });
 
         server.listen(REDIRECT_PORT, () => {
-            logger.info(`OAuth 콜백 서버 대기 중: http://localhost:${REDIRECT_PORT}`);
+            logger.info(`OAuth callback server listening: http://localhost:${REDIRECT_PORT}`);
         });
 
         // 5분 타임아웃
         setTimeout(
             () => {
                 server.close();
-                reject(new Error("로그인 타임아웃 (5분)"));
+                reject(new Error(getT()("auth.login_timeout")));
             },
             5 * 60 * 1000,
         );
@@ -152,8 +154,9 @@ export async function login() {
 
 // access_token 갱신
 export async function refreshToken(authData) {
+    const t = getT();
     const refreshTk = authData?.tokens?.refresh_token;
-    if (!refreshTk) throw new Error("refresh_token이 없습니다. 다시 로그인하세요.");
+    if (!refreshTk) throw new Error(t("auth.no_refresh_token"));
 
     const res = await fetch(`${AUTH_BASE}/oauth/token`, {
         method: "POST",
@@ -168,7 +171,7 @@ export async function refreshToken(authData) {
 
     if (!res.ok) {
         const errBody = await res.text();
-        throw new Error(`토큰 갱신 실패: ${res.status} ${errBody}`);
+        throw new Error(t("auth.token_refresh_failed", { status: res.status, body: errBody }));
     }
 
     const tokenData = await res.json();
@@ -184,15 +187,16 @@ export async function refreshToken(authData) {
     authData.last_refresh = new Date().toISOString();
 
     saveAuth(authData);
-    logger.info("토큰 갱신 완료");
+    logger.info("Token refreshed");
     return authData;
 }
 
 // 유효한 access_token 보장 (필요 시 자동 갱신)
 export async function ensureValidToken() {
+    const t = getT();
     let authData = loadAuth();
     if (!authData?.tokens?.access_token) {
-        throw new Error("인증 정보가 없습니다. `igobot login`으로 로그인하세요.");
+        throw new Error(t("auth.no_auth"));
     }
 
     // access_token JWT exp 확인
@@ -202,12 +206,12 @@ export async function ensureValidToken() {
         const now = Date.now();
         // 만료 5분 전이면 갱신
         if (now > expMs - 5 * 60 * 1000) {
-            logger.info("access_token 만료 임박, 갱신 중...");
+            logger.info("access_token expiring soon, refreshing...");
             authData = await refreshToken(authData);
         }
     } catch {
         // JWT 파싱 실패 시 갱신 시도
-        logger.warn("access_token 파싱 실패, 갱신 시도...");
+        logger.warn("access_token parse failed, attempting refresh...");
         authData = await refreshToken(authData);
     }
 
@@ -217,13 +221,15 @@ export async function ensureValidToken() {
 // CLI에서 직접 실행 시 로그인 수행
 const isMain = process.argv[1]?.endsWith("codex-auth.js");
 if (isMain) {
+    // CLI 단독 실행 시 .env 로드 (언어 설정 반영)
+    await import("dotenv/config");
     login()
         .then(() => {
-            console.log("\n로그인 완료! `igobot start`로 봇을 시작하세요.");
+            console.log(getT()("auth.login_complete"));
             process.exit(0);
         })
         .catch((err) => {
-            console.error("로그인 실패:", err.message);
+            console.error(getT()("auth.login_failed"), err.message);
             process.exit(1);
         });
 }

@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import config from "../core/config.js";
 import logger from "../utils/logger.js";
 import { markdownToTelegramHtml, escapeHtml, splitAndConvert } from "../utils/markdown.js";
+import { getT } from "../i18n.js";
 
 // 텔레그램 봇 모듈 (메시지 수신, 승인, 스트리밍, 도구기록 처리)
 class TelegramBot {
@@ -17,7 +18,7 @@ class TelegramBot {
 
     async start(messageHandler) {
         const token = config.telegram.token;
-        if (!token) throw new Error("TELEGRAM_BOT_TOKEN이 설정되지 않았습니다.");
+        if (!token) throw new Error(getT()("bot.token_missing"));
 
         this.bot = new Telegraf(token);
         this.onMessage = messageHandler;
@@ -31,10 +32,10 @@ class TelegramBot {
             if (ctx.from.is_bot) return next();
             const userId = String(ctx.from.id);
             if (allowedUsers.length > 0 && !allowedUsers.includes(userId)) {
-                logger.warn(`미허가 사용자 접근 시도: ${userId} (${ctx.from?.username})`);
+                logger.warn(`Unauthorized access attempt: ${userId} (${ctx.from?.username})`);
                 // 메시지가 있을 때만 접근 거부 응답
                 if (ctx.message || ctx.callbackQuery) {
-                    return ctx.reply("⛔ 접근 권한이 없습니다.");
+                    return ctx.reply(getT()("bot.access_denied"));
                 }
                 return;
             }
@@ -42,23 +43,16 @@ class TelegramBot {
         });
 
         this.bot.start((ctx) => {
-            ctx.replyWithHTML(
-                "<b>🤖 igobot</b> 활성화됨\n\n" +
-                    "메시지를 보내면 AI 에이전트가 응답합니다.\n" +
-                    "쓰기/실행 작업은 승인을 요청합니다.\n\n" +
-                    "<b>명령어:</b>\n" +
-                    "/reset — 대화 초기화\n" +
-                    "/status — 상태 확인",
-            );
+            ctx.replyWithHTML(getT()("bot.start"));
         });
 
         this.bot.command("reset", (ctx) => {
             if (this.onReset) this.onReset(ctx.chat.id);
-            ctx.reply("🔄 대화가 초기화되었습니다.");
+            ctx.reply(getT()("bot.reset"));
         });
 
         this.bot.command("status", (ctx) => {
-            ctx.reply("✅ 에이전트 작동 중");
+            ctx.reply(getT()("bot.status"));
         });
 
         // ===== 승인 콜백 =====
@@ -68,7 +62,7 @@ class TelegramBot {
             if (pending) {
                 pending.resolve(true);
                 this._pendingApprovals.delete(id);
-                await ctx.answerCbQuery("✅ 승인됨");
+                await ctx.answerCbQuery(getT()("bot.approved"));
                 try {
                     await ctx.deleteMessage();
                 } catch {}
@@ -83,7 +77,7 @@ class TelegramBot {
                 this.yoloRuns.add(pending.chatId);
                 pending.resolve(true);
                 this._pendingApprovals.delete(id);
-                await ctx.answerCbQuery("🚀 YOLO 모드 ON");
+                await ctx.answerCbQuery(getT()("bot.yolo_on"));
                 try {
                     await ctx.deleteMessage();
                 } catch {}
@@ -96,7 +90,7 @@ class TelegramBot {
             if (pending) {
                 pending.resolve(false);
                 this._pendingApprovals.delete(id);
-                await ctx.answerCbQuery("❌ 거부됨");
+                await ctx.answerCbQuery(getT()("bot.denied"));
                 try {
                     await ctx.deleteMessage();
                 } catch {}
@@ -114,8 +108,8 @@ class TelegramBot {
                 messageId: ctx.message.message_id,
             };
             this.onMessage(ctx.chat.id, msg).catch((err) => {
-                logger.error("메시지 처리 오류:", err);
-                this.send(ctx.chat.id, `⚠️ 오류: ${err.message}`).catch(() => {});
+                logger.error("Message handling error:", err);
+                this.send(ctx.chat.id, getT()("bot.error", { msg: err.message })).catch(() => {});
             });
         });
 
@@ -130,7 +124,7 @@ class TelegramBot {
             } catch {}
             const msg = {
                 type: "photo",
-                text: ctx.message.caption || "[사진]",
+                text: ctx.message.caption || getT()("bot.photo"),
                 photoUrl,
                 fileId: largest.file_id,
                 replyToMessageId: ctx.message.reply_to_message?.message_id || null,
@@ -149,7 +143,7 @@ class TelegramBot {
             } catch {}
             const msg = {
                 type: "document",
-                text: ctx.message.caption || `[문서: ${doc.file_name}]`,
+                text: ctx.message.caption || getT()("bot.document", { name: doc.file_name }),
                 fileName: doc.file_name,
                 mimeType: doc.mime_type,
                 fileUrl,
@@ -164,7 +158,7 @@ class TelegramBot {
             if (!this.onMessage) return;
             const msg = {
                 type: "sticker",
-                text: `[스티커: ${ctx.message.sticker.emoji || ""}]`,
+                text: getT()("bot.sticker", { emoji: ctx.message.sticker.emoji || "" }),
                 replyToMessageId: ctx.message.reply_to_message?.message_id || null,
                 messageId: ctx.message.message_id,
             };
@@ -180,7 +174,7 @@ class TelegramBot {
             } catch {}
             const msg = {
                 type: "voice",
-                text: "[음성 메시지]",
+                text: getT()("bot.voice"),
                 fileUrl,
                 duration: ctx.message.voice.duration,
                 replyToMessageId: ctx.message.reply_to_message?.message_id || null,
@@ -194,7 +188,7 @@ class TelegramBot {
             const loc = ctx.message.location;
             const msg = {
                 type: "location",
-                text: `[위치: ${loc.latitude}, ${loc.longitude}]`,
+                text: getT()("bot.location", { lat: loc.latitude, lon: loc.longitude }),
                 latitude: loc.latitude,
                 longitude: loc.longitude,
                 replyToMessageId: ctx.message.reply_to_message?.message_id || null,
@@ -205,7 +199,7 @@ class TelegramBot {
 
         // 봇 시작
         await this.bot.launch();
-        logger.info("텔레그램 봇 시작됨");
+        logger.info("Telegram bot started");
 
         process.once("SIGINT", () => this.bot.stop("SIGINT"));
         process.once("SIGTERM", () => this.bot.stop("SIGTERM"));
@@ -261,7 +255,7 @@ class TelegramBot {
             });
         } catch (err) {
             if (!err.message?.includes("not modified")) {
-                logger.debug(`메시지 편집 실패: ${err.message}`);
+                logger.debug(`editMessage failed: ${err.message}`);
             }
         }
     }
@@ -283,7 +277,7 @@ class TelegramBot {
             });
             return true;
         } catch (err) {
-            logger.debug(`setReaction 실패 (${emoji}): ${err.message}`);
+            logger.debug(`setReaction failed (${emoji}): ${err.message}`);
             return false;
         }
     }
@@ -362,21 +356,22 @@ class TelegramBot {
 
     // 승인 요청 (HTML + 코드블록, 승인/거부 후 메시지 삭제)
     async requestApproval(chatId, toolName, args) {
+        const t = getT();
         const approvalId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const raw = typeof args === "string" ? args : JSON.stringify(args, null, 2);
-        const argsStr = raw.length > 1500 ? raw.slice(0, 1500) + "\n...[생략]..." : raw;
+        const argsStr = raw.length > 1500 ? raw.slice(0, 1500) + "\n" + t("bot.approval_truncated") : raw;
 
         const message =
-            `🔐 <b>실행 승인 요청</b>\n\n` +
-            `<b>도구:</b> <code>${escapeHtml(toolName)}</code>\n` +
-            `<b>인자:</b>\n<pre>${escapeHtml(argsStr)}</pre>`;
+            `${t("bot.approval_title")}\n\n` +
+            `<b>${t("bot.approval_tool")}</b> <code>${escapeHtml(toolName)}</code>\n` +
+            `<b>${t("bot.approval_args")}</b>\n<pre>${escapeHtml(argsStr)}</pre>`;
 
         const sent = await this.bot.telegram.sendMessage(chatId, message, {
             parse_mode: "HTML",
             reply_markup: Markup.inlineKeyboard([
-                Markup.button.callback("🚀 YOLO", `yolo:${approvalId}`),
-                Markup.button.callback("✅ 승인", `approve:${approvalId}`),
-                Markup.button.callback("❌ 거부", `deny:${approvalId}`),
+                Markup.button.callback(t("bot.approval_btn_yolo"), `yolo:${approvalId}`),
+                Markup.button.callback(t("bot.approval_btn_approve"), `approve:${approvalId}`),
+                Markup.button.callback(t("bot.approval_btn_deny"), `deny:${approvalId}`),
             ]).reply_markup,
         });
 
@@ -400,17 +395,18 @@ class TelegramBot {
     // 도구 기록을 파일로만 저장
     saveToolLogToFile(toolHistory) {
         if (!toolHistory || toolHistory.length === 0) return null;
+        const t = getT();
 
         try {
-            const lines = ["도구 사용 기록", "=".repeat(50), ""];
+            const lines = [t("bot.tool_log_title"), "=".repeat(50), ""];
             for (const entry of toolHistory) {
                 lines.push(`[${entry.name}]`);
                 if (entry.args) {
                     const s = typeof entry.args === "string" ? entry.args : JSON.stringify(entry.args, null, 2);
-                    lines.push(`인자:\n${s}`);
+                    lines.push(`${t("bot.tool_log_args")}\n${s}`);
                 }
                 if (entry.result) {
-                    lines.push(`결과:\n${entry.result}`);
+                    lines.push(`${t("bot.tool_log_result")}\n${entry.result}`);
                 }
                 lines.push("");
             }
@@ -423,10 +419,10 @@ class TelegramBot {
             const filePath = resolve(dir, filename);
             writeFileSync(filePath, content, "utf-8");
 
-            logger.info(`도구 기록 저장: ${filePath}`);
+            logger.info(`Tool log saved: ${filePath}`);
             return filePath;
         } catch (err) {
-            logger.error("도구 기록 파일 저장 실패:", err);
+            logger.error("Failed to save tool log:", err);
             return null;
         }
     }
@@ -446,7 +442,7 @@ class TelegramBot {
                 text: "⏳",
             });
         } catch (err) {
-            logger.debug(`sendMessageDraft 실패 (초기): ${err.message}`);
+            logger.debug(`sendMessageDraft failed (init): ${err.message}`);
         }
         return draftId;
     }
@@ -464,7 +460,7 @@ class TelegramBot {
                 parse_mode: "HTML",
             });
         } catch (err) {
-            logger.debug(`sendMessageDraft 업데이트 실패: ${err.message}`);
+            logger.debug(`sendMessageDraft update failed: ${err.message}`);
         }
     }
 

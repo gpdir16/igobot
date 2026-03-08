@@ -13,7 +13,7 @@ import {
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { SUPPORTED_LANGUAGES, createT } from "./i18n.js";
+import { SUPPORTED_LANGUAGES, createT } from "../i18n.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -53,7 +53,7 @@ function writeEnv(env) {
         "# Log level: error, warn, info, debug",
         `LOG_LEVEL=${env.LOG_LEVEL ?? "error"}`,
         "",
-        "# Language: en, ko",
+        "# Language (e.g. en, ko — see SUPPORTED_LANGUAGES in i18n.js)",
         `LANGUAGE=${env.LANGUAGE ?? "en"}`,
     ];
     writeFileSync(ENV_FILE, lines.join("\n") + "\n", "utf-8");
@@ -83,18 +83,18 @@ export async function runOnboarding({ isFirstRun = false } = {}) {
         existingEnv = parseEnv(readFileSync(ENV_FILE, "utf-8"));
     }
 
-    // ── 언어 선택 (이중언어 표시 — 아직 언어를 모르므로) ─────────────────────
-    intro(" igobot Setup Wizard / 설정 마법사 ");
+    // ── 언어 선택 (언어 선택 전이므로 영어 표시) ──────────────────────────────
+    intro(" igobot Setup Wizard ");
 
     const langValue = await select({
-        message: "Select your language / 언어를 선택하세요",
+        message: "Select your language",
         options: SUPPORTED_LANGUAGES,
         initialValue: existingEnv.LANGUAGE || "en",
     });
 
-    // 언어 선택 취소는 이중언어 메시지로 처리
+    // 언어 선택 취소는 영어로 처리 (아직 t()를 사용할 수 없음)
     if (isCancel(langValue)) {
-        cancel("Setup cancelled. / 설정을 취소했습니다.");
+        cancel("Setup cancelled.");
         process.exit(0);
     }
 
@@ -148,22 +148,22 @@ export async function runOnboarding({ isFirstRun = false } = {}) {
     // ── [3/4] 에이전트 설정 ──────────────────────────────────────────────────
     const maxIterations = abortIfCancel(
         await text({
-            message: t("agent.max_iter"),
+            message: t("agent_setup.max_iter"),
             placeholder: "100",
             defaultValue: existingEnv.AGENT_MAX_ITERATIONS || "100",
             validate(value) {
                 const n = parseInt(value, 10);
-                if (isNaN(n) || n < 1) return t("agent.max_iter_invalid");
-                if (n > 1000) return t("agent.max_iter_too_large");
+                if (isNaN(n) || n < 1) return t("agent_setup.max_iter_invalid");
+                if (n > 1000) return t("agent_setup.max_iter_too_large");
             },
         }),
         t,
     );
 
-    const logHints = t("agent.log_hints");
+    const logHints = t("agent_setup.log_hints");
     const logLevel = abortIfCancel(
         await select({
-            message: t("agent.log_level"),
+            message: t("agent_setup.log_level"),
             options: [
                 { value: "error", label: "error", hint: logHints.error },
                 { value: "warn", label: "warn", hint: logHints.warn },
@@ -226,7 +226,7 @@ export async function runOnboarding({ isFirstRun = false } = {}) {
 const isMain = import.meta.url === `file://${process.argv[1]}`;
 if (isMain) {
     runOnboarding().catch((err) => {
-        console.error(`\n오류 / Error: ${err.message}`);
+        console.error(`\nError: ${err.message}`);
         process.exit(1);
     });
 }

@@ -4,45 +4,7 @@ import config from "./config.js";
 import memoryStore from "./memory.js";
 import { needsCompression, compressContext } from "./context-compressor.js";
 import logger from "../utils/logger.js";
-
-const SYSTEM_PROMPT = `당신은 igobot이라는 자율 AI 에이전트입니다.
-사용자의 요청을 수행하기 위해 제공된 도구들을 자유롭게 사용하세요.
-
-**중요 — 실행 환경:**
-- 이것은 서버에서 실행되는 에이전트입니다. GUI나 화면이 없습니다.
-- 사용자에게 보여줄 모든 내용은 반드시 텔레그램 메시지로 전송해야 합니다.
-- 코드 실행 결과, 파일 내용 등도 사용자에게 텍스트로 전달하세요.
-- **파일 작업(write_file, delete_file)은 data/workspace/ 디렉토리 내에서만 가능합니다.** 이 경로를 기준으로 상대 경로를 사용하세요.
-- 사용자가 이미지를 보내면 직접 볼 수 있습니다. 이미지 분석이 가능합니다.
-
-사용 가능한 도구:
-- run_terminal: 터미널에서 셸 명령 실행
-- read_file: 파일 내용 읽기
-- list_directory: 디렉토리 내용 목록
-- search_files: 파일에서 텍스트 검색
-- write_file: 파일 생성/수정 (data/workspace/ 기준)
-- delete_file: 파일 삭제 (data/workspace/ 기준)
-- browser_fetch: 웹페이지 내용 가져오기
-- browser_interact: 웹페이지 인터랙션
-- send_photo: 로컬 파일 또는 URL을 사용자에게 사진으로 전송
-- send_document: 로컬 파일 또는 URL을 사용자에게 문서로 전송
-- memory_save: 중요 정보를 영구 메모리에 저장 (마크다운 파일)
-- memory_search: 저장된 메모리 검색
-- memory_list: 모든 메모리 파일 목록 확인
-- memory_delete: 저장된 메모리 삭제
-
-행동 원칙:
-1. 요청을 분석하고 필요한 정보를 도구로 수집하세요.
-2. 중요한 정보(사용자 선호, 프로젝트 정보, 기억해야 할 사항)는 memory_save로 저장하세요. 파일명은 내용을 잘 나타내는 이름으로 정하세요.
-3. 저장된 메모리를 확인하려면 memory_list를 호출하세요. 모든 메모리 내용이 반환됩니다.
-4. 특정 메모리를 찾으려면 memory_search를 사용하세요.
-5. 작업 결과를 명확하고 간결하게 보고하세요.
-6. 파일(사진, 문서 등)을 생성/다운로드했으면 send_photo 또는 send_document로 사용자에게 직접 전송하세요.
-7. 한국어로 응답하세요.
-
-웹 스크래핑 규칙:
-- 웹 데이터 수집은 반드시 정식 브라우저 도구를 사용하세요.
-- BeautifulSoup, requests, scrapy 등 스크립트 작성 및 실행 절대 금지.`;
+import { getT } from "../i18n.js";
 
 // 에이전트 코어 (LLM-도구 루프, 스트리밍, 컨텍스트 압축, 메모리)
 class Agent {
@@ -59,7 +21,7 @@ class Agent {
 
     async init() {
         await this.moduleLoader.loadTools();
-        logger.info(`에이전트 초기화 완료 (도구 ${this.moduleLoader.tools.size}개)`);
+        logger.info(`Agent initialized (${this.moduleLoader.tools.size} tools)`);
     }
 
     // 스킬 지시문(SKILL.md 본문)을 시스템 프롬프트에 추가
@@ -79,7 +41,7 @@ class Agent {
         this.conversations.delete(chatId);
         this.pendingMessages.delete(chatId);
         this.llm.resetSession();
-        logger.info(`대화 초기화: ${chatId}`);
+        logger.info(`Conversation reset: ${chatId}`);
     }
 
     // 대기 중인 새 메시지를 컨텍스트에 반영
@@ -115,7 +77,7 @@ class Agent {
                 this.pendingMessages.set(chatId, []);
             }
             this.pendingMessages.get(chatId).push(typeof userMsg === "string" ? { type: "text", text: userMsg } : userMsg);
-            logger.info(`[${chatId}] 에이전트 실행 중 — 대기 큐에 추가: ${messageText.slice(0, 50)}`);
+            logger.info(`[${chatId}] Agent running — queued: ${messageText.slice(0, 50)}`);
             return;
         }
 
@@ -142,7 +104,7 @@ class Agent {
                 const nextMsg = queue.shift();
                 // 재귀적으로 실행 (비동기)
                 this.handleMessage(chatId, nextMsg).catch((err) => {
-                    logger.error("대기 메시지 처리 오류:", err);
+                    logger.error("Pending message processing error:", err);
                 });
             }
         }
@@ -150,6 +112,7 @@ class Agent {
 
     // 실제 에이전트 루프
     async _runAgentLoop(chatId, userMsg) {
+        const t = getT();
         const messages = this.getConversation(chatId);
         const messageText = typeof userMsg === "string" ? userMsg : userMsg.text || `[${userMsg.type}]`;
 
@@ -159,12 +122,12 @@ class Agent {
             // LLM이 이미지를 직접 볼 수 있도록 input_image 타입 포함
             userContent = [
                 { type: "input_image", image_url: userMsg.photoUrl },
-                { type: "input_text", text: messageText || "이 이미지를 분석해주세요." },
+                { type: "input_text", text: messageText || t("agent.image_prompt") },
             ];
         } else if (userMsg.type === "document" && userMsg.fileUrl) {
-            userContent = `[문서 업로드됨: ${userMsg.fileName} — ${userMsg.fileUrl}]\n${messageText}`;
+            userContent = t("agent.document_label", { name: userMsg.fileName, url: userMsg.fileUrl }) + "\n" + messageText;
         } else if (userMsg.type === "voice") {
-            userContent = `[음성 메시지: ${userMsg.fileUrl || ""}]\n${messageText}`;
+            userContent = t("agent.voice_label", { url: userMsg.fileUrl || "" }) + "\n" + messageText;
         } else {
             userContent = messageText;
         }
@@ -173,7 +136,8 @@ class Agent {
 
         // 메모리를 시스템 프롬프트에 포함 (모든 메모리 파일 내용 주입)
         const memoryContext = memoryStore.getAllForContext();
-        const instructions = SYSTEM_PROMPT + (this._skillSection || "") + memoryContext;
+        // 설정된 언어로 시스템 프롬프트 로드
+        const instructions = t("system_prompt") + (this._skillSection || "") + memoryContext;
 
         const tools = this.moduleLoader.getToolSchemas();
         const maxIterations = config.agent.maxIterations;
@@ -202,7 +166,7 @@ class Agent {
 
         while (iteration < maxIterations) {
             iteration++;
-            logger.info(`에이전트 루프 ${iteration}/${maxIterations}`);
+            logger.info(`Agent loop ${iteration}/${maxIterations}`);
 
             // 이번 모델 호출 전에 도착한 메시지를 우선 컨텍스트에 반영
             const preDrained = this._drainPendingMessages(chatId, messages);
@@ -217,9 +181,9 @@ class Agent {
             // 우선순위: 직전 동일 컨텍스트의 모델 API 실제값 > 추정값
             const contextWindowLimit = this.llm.contextWindow ?? config.agent.contextWindow;
             if (needsCompression(messages, contextWindowLimit, lastActualInputTokens)) {
-                logger.info("컨텍스트 압축 시작...");
+                logger.info("Starting context compression...");
                 if (this.bot && streamMsgId) {
-                    await this.bot.updateStream(chatId, streamMsgId, "🔄 대화 내용을 정리하고 있습니다...");
+                    await this.bot.updateStream(chatId, streamMsgId, t("agent.context_compressing"));
                 }
                 const compressed = await compressContext(messages, this.llm);
                 messages.length = 0;
@@ -277,13 +241,13 @@ class Agent {
                         const drained = drainedMessages.length > 0;
                         if (drained) {
                             lastActualInputTokens = null;
-                            logger.info(`[${chatId}] 새 대기 메시지 우선 처리 — 남은 도구 호출 보류`);
+                            logger.info(`[${chatId}] New pending message — deferring remaining tool calls`);
                         }
                         return drained;
                     };
 
                     for (const toolCall of response.toolCalls) {
-                        logger.info(`도구 호출: ${toolCall.name}`);
+                        logger.info(`Tool call: ${toolCall.name}`);
 
                         messages.push({
                             type: "function_call",
@@ -296,7 +260,7 @@ class Agent {
                         try {
                             args = typeof toolCall.arguments === "string" ? JSON.parse(toolCall.arguments) : toolCall.arguments;
                         } catch {
-                            const errMsg = `도구 인자 파싱 실패: ${toolCall.arguments}`;
+                            const errMsg = `Tool args parse error: ${toolCall.arguments}`;
                             messages.push({ role: "tool", call_id: toolCall.call_id, content: errMsg });
                             toolHistory.push({ name: toolCall.name, args: toolCall.arguments, result: errMsg });
                             if (flushPendingAfterTool()) {
@@ -312,7 +276,7 @@ class Agent {
                         if (tool?.requiresApproval && this.bot && !yolo) {
                             const approved = await this.bot.requestApproval(chatId, toolCall.name, args);
                             if (!approved) {
-                                const denyMsg = "사용자가 실행을 거부했습니다.";
+                                const denyMsg = t("agent.denied");
                                 messages.push({ role: "tool", call_id: toolCall.call_id, content: denyMsg });
                                 toolHistory.push({ name: toolCall.name, args, result: denyMsg });
                                 if (flushPendingAfterTool()) {
@@ -331,8 +295,8 @@ class Agent {
                             messages.push({ role: "tool", call_id: toolCall.call_id, content: resultStr });
                             toolHistory.push({ name: toolCall.name, args, result: resultStr });
                         } catch (err) {
-                            logger.error(`도구 실행 오류: ${toolCall.name}`, err);
-                            const errStr = `도구 실행 오류: ${err.message}`;
+                            logger.error(`Tool execution error: ${toolCall.name}`, err);
+                            const errStr = t("agent.tool_error", { msg: err.message });
                             messages.push({ role: "tool", call_id: toolCall.call_id, content: errStr });
                             toolHistory.push({ name: toolCall.name, args, result: errStr });
                         }
@@ -374,7 +338,7 @@ class Agent {
                             // LLM이 다음 턴에 상황을 인지하도록 컨텍스트에 주입
                             messages.push({
                                 role: "user",
-                                content: "[시스템: 위 응답은 새 메시지 도착으로 인해 사용자에게 표시되지 않았습니다. 이어지는 메시지를 처리하세요.]",
+                                content: t("agent.interrupted"),
                             });
                         } else {
                             await this.bot.finishStream(chatId, streamMsgId, response.text, toolHistory.length > 0 ? toolHistory : null);
@@ -397,7 +361,7 @@ class Agent {
                 this.bot?.yoloRuns?.delete(chatId);
                 break;
             } catch (err) {
-                logger.error("에이전트 루프 오류:", err);
+                logger.error("Agent loop error:", err);
                 this.bot?.yoloRuns?.delete(chatId);
                 if (this.bot) {
                     if (streamMsgId) {
@@ -411,14 +375,14 @@ class Agent {
                         } catch {}
                         streamMsgId = null;
                     }
-                    await this.bot.send(chatId, `⚠️ 에이전트 오류: ${err.message}`);
+                    await this.bot.send(chatId, t("agent.error", { msg: err.message }));
                 }
                 break;
             }
         }
 
         if (iteration >= maxIterations) {
-            logger.warn("에이전트 최대 반복 도달");
+            logger.warn("Agent max iterations reached");
             this.bot?.yoloRuns?.delete(chatId);
             if (this.bot) {
                 if (streamMsgId) {
@@ -430,7 +394,7 @@ class Agent {
                         });
                     } catch {}
                 }
-                await this.bot.send(chatId, "⚠️ 최대 작업 반복에 도달했습니다.");
+                await this.bot.send(chatId, t("agent.max_iter"));
             }
         }
 

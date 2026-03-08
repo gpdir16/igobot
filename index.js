@@ -5,7 +5,7 @@ import SkillLoader from "./src/core/skill-loader.js";
 import logger from "./src/utils/logger.js";
 
 async function main() {
-    logger.info("igobot 시작 중...");
+    logger.info("igobot starting...");
 
     // 에이전트 초기화 (기본 도구 로드)
     const agent = new Agent();
@@ -29,10 +29,10 @@ async function main() {
     const messageHandler = (chatId, msg) => agent.handleMessage(chatId, msg);
     await bot.start(messageHandler);
 
-    logger.info("igobot 준비 완료!");
+    logger.info("igobot ready!");
 }
 
 main().catch((err) => {
-    logger.error("치명적 오류:", err);
+    logger.error("Fatal error:", err);
     process.exit(1);
 });
