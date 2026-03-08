@@ -246,9 +246,16 @@ async function runLogin() {
 async function runSetup() {
     const { runOnboarding } = await import("../src/onboarding/index.js");
     await runOnboarding();
+    // @clack/prompts 가 raw mode 를 남겨두는 경우를 대비해 터미널을 확실히 복구
     if (process.stdin.isTTY) {
         try { process.stdin.setRawMode(false); } catch {}
     }
+    // stty sane 으로 echo/canonical 모드 강제 복구 (curl|bash + exec node 환경 대비)
+    try {
+        const { execFileSync } = await import("child_process");
+        execFileSync("stty", ["sane"], { stdio: ["inherit", "ignore", "ignore"] });
+    } catch {}
+    process.stdout.write("\x1b[?25h"); // 커서 강제 표시
     process.stdin.pause();
     process.exit(0);
 }
