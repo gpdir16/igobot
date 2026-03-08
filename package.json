@@ -4,6 +4,9 @@
     "description": "Autonomous AI agent powered by Codex OAuth, with Telegram interface",
     "type": "module",
     "main": "index.js",
+    "bin": {
+        "igobot": "./bin/igobot.js"
+    },
     "scripts": {
         "start": "node index.js",
         "login": "node src/llm/codex-auth.js",
