@@ -15,6 +15,7 @@ It's similar to OpenClaw but safer, lighter, and simpler.
 - Supports skills and tools
 - Works in an isolated environment
 - Can control its own Firefox browser
+- Can capture webpage screenshots and send them back through the messenger
 - Can use many tools including terminal/files/browser
 - And more...
 

@@ -216,6 +216,7 @@ Available tools:
 - delete_file: Delete files (\`inWorkspace:true\` => data/workspace/ relative, \`false\` => project-root-relative or absolute path)
 - browser_fetch: Fetch web page content
 - browser_interact: Interact with web pages
+- browser_screenshot: Capture webpage screenshots as PNG files
 - send_photo: Send a local file or URL to the user as a photo
 - send_document: Send a local file or URL to the user as a document
 - memory_save: Save important information to persistent memory (markdown file)
@@ -443,6 +444,7 @@ Web scraping rules:
 - delete_file: 파일 삭제 (\`inWorkspace:true\`면 data/workspace/ 기준, \`false\`면 프로젝트 루트 기준 상대 경로 또는 절대 경로)
 - browser_fetch: 웹페이지 내용 가져오기
 - browser_interact: 웹페이지 인터랙션
+- browser_screenshot: 웹페이지 스크린샷을 PNG 파일로 저장
 - send_photo: 로컬 파일 또는 URL을 사용자에게 사진으로 전송
 - send_document: 로컬 파일 또는 URL을 사용자에게 문서로 전송
 - memory_save: 중요 정보를 영구 메모리에 저장 (마크다운 파일)

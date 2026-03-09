@@ -1,12 +1,38 @@
 import { execSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { WORKSPACE_DIR } from "../core/app-paths.js";
 import logger from "../utils/logger.js";
 
 let _playwright = null;
 let _browser = null;
+const SCREENSHOT_DIR = resolve(WORKSPACE_DIR, "screenshots");
 
 // 세션 맵: sessionId -> { context, page }
 const _sessions = new Map();
+
+function isWithinDir(targetPath, baseDir) {
+    return targetPath === baseDir || targetPath.startsWith(baseDir + "/");
+}
+
+function resolveScreenshotPath(outputPath) {
+    const absPath = outputPath
+        ? outputPath.startsWith("/")
+            ? resolve(outputPath)
+            : resolve(WORKSPACE_DIR, outputPath)
+        : resolve(SCREENSHOT_DIR, `screenshot-${Date.now()}.png`);
+
+    if (!isWithinDir(absPath, WORKSPACE_DIR)) {
+        throw new Error("Screenshot path must stay inside data/workspace/.");
+    }
+    if (!absPath.toLowerCase().endsWith(".png")) {
+        throw new Error("Screenshot path must end with .png.");
+    }
+
+    const dir = dirname(absPath);
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    return absPath;
+}
 
 // Firefox가 설치되어 있지 않으면 자동 설치
 async function ensureFirefoxInstalled() {
@@ -198,6 +224,65 @@ export const browserInteract = {
     },
 };
 
+export const browserScreenshot = {
+    name: "browser_screenshot",
+    description:
+        "Captures a PNG screenshot of the current page or a specific URL. Saves inside data/workspace/ by default and supports session reuse.",
+    requiresApproval: false,
+    schema: {
+        type: "object",
+        properties: {
+            url: { type: "string", description: "URL to navigate to before capturing (optional)" },
+            waitFor: { type: "string", description: "CSS selector to wait for before capturing (optional)" },
+            selector: { type: "string", description: "CSS selector to capture instead of the full page (optional)" },
+            fullPage: { type: "boolean", description: "Capture the full page when selector is omitted (optional, default: true)" },
+            path: {
+                type: "string",
+                description: "Output PNG path. Relative paths are resolved inside data/workspace/ (optional).",
+            },
+            timeout: { type: "number", description: "Timeout in ms (optional, default: 15000)" },
+            sessionId: { type: "string", description: "Session ID (optional, default: 'default'). Preserves cookies/login state." },
+        },
+    },
+    async execute(args) {
+        const {
+            url,
+            waitFor,
+            selector,
+            fullPage = true,
+            path,
+            timeout = 15000,
+            sessionId = "default",
+        } = args;
+        const { page } = await getSession(sessionId);
+
+        try {
+            if (url) {
+                await page.goto(url, { waitUntil: "domcontentloaded", timeout });
+            }
+            if (waitFor) {
+                await page.waitForSelector(waitFor, { timeout: timeout / 2 });
+            }
+            if (selector) {
+                await page.waitForSelector(selector, { timeout: timeout / 2 });
+            }
+            await page.waitForTimeout(1000);
+
+            const outputPath = resolveScreenshotPath(path);
+            if (selector) {
+                await page.locator(selector).first().screenshot({ path: outputPath });
+            } else {
+                await page.screenshot({ path: outputPath, fullPage });
+            }
+
+            const title = await page.title().catch(() => "");
+            return `Screenshot saved: ${outputPath}\nURL: ${page.url()}\nTitle: ${title}\nSession: ${sessionId}`;
+        } catch (err) {
+            return `Screenshot failed: ${err.message}`;
+        }
+    },
+};
+
 export { closeBrowser };
 
-export default [browseFetch, browserInteract];
+export default [browseFetch, browserInteract, browserScreenshot];
