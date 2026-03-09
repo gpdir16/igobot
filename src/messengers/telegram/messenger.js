@@ -2,6 +2,7 @@ import { Telegraf, Markup } from "telegraf";
 import { createReadStream, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import config from "../../core/config.js";
+import { TOOL_LOG_DIR } from "../../core/app-paths.js";
 import { getT } from "../../i18n.js";
 import logger from "../../utils/logger.js";
 import { escapeHtml, markdownToTelegramHtml, splitAndConvert } from "../../utils/markdown.js";
@@ -46,7 +47,7 @@ class TelegramMessenger extends BaseMessenger {
 
             if (ctx.callbackQuery) {
                 try {
-                    await ctx.answerCbQuery(getT()("bot.auth_pending_short"), { show_alert: true });
+                    await ctx.answerCbQuery(getT()("access.pending_short"), { show_alert: true });
                 } catch {}
                 return;
             }
@@ -379,7 +380,7 @@ class TelegramMessenger extends BaseMessenger {
             }
             const content = lines.join("\n");
 
-            const dir = resolve(process.cwd(), "data", "workspace", "tool_logs");
+            const dir = TOOL_LOG_DIR;
             if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
             const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
             const filename = `toollog_${timestamp}.txt`;
@@ -447,7 +448,12 @@ class TelegramMessenger extends BaseMessenger {
 
     buildAccessRequestMessage(request) {
         const t = getT();
-        return t("bot.auth_request_message", { code: escapeHtml(request.code) });
+        return (
+            `<b>${escapeHtml(t("access.request_title"))}</b>\n\n` +
+            `${escapeHtml(t("access.request_body", { code: request.code }))}`
+                .replace(/igobot ok ([A-Z0-9]+)/g, "<code>igobot ok $1</code>")
+                .replace(/\n/g, "\n")
+        );
     }
 }
 

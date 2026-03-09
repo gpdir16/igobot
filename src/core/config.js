@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from "node:fs";
-import { resolve } from "node:path";
 import { getCodexAuthFile } from "./auth-paths.js";
+import { MODEL_FILE } from "./app-paths.js";
 
 // 앱 설정 로더 (.env + data/auth/codex.json + model.json 통합)
 class Config {
@@ -22,7 +22,7 @@ class Config {
         }
 
         // model.json에서 모델 설정 로드
-        const modelPath = resolve(process.cwd(), "model.json");
+        const modelPath = MODEL_FILE;
         if (existsSync(modelPath)) {
             try {
                 this._cache.model = JSON.parse(readFileSync(modelPath, "utf-8"));
@@ -34,24 +34,38 @@ class Config {
         }
     }
 
-    _parseList(value) {
-        return String(value || "")
-            .split(",")
-            .map((item) => item.trim())
-            .filter(Boolean);
-    }
-
     get messengers() {
-        const requested = this._parseList(process.env.ENABLED_MESSENGERS);
         const telegram = {
             token: process.env.TELEGRAM_BOT_TOKEN,
         };
+        const discord = {
+            token: process.env.DISCORD_BOT_TOKEN,
+        };
+        const legacyEnabled = String(process.env.ENABLED_MESSENGERS || "")
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean);
+        const requestedActive = String(process.env.ACTIVE_MESSENGER || "").trim();
 
-        const enabled = requested.length > 0 ? requested : telegram.token ? ["telegram"] : [];
+        let active = requestedActive;
+        if (!active && legacyEnabled.length > 0) {
+            active = legacyEnabled[0];
+        }
+        if (!active) {
+            if (telegram.token) active = "telegram";
+            else if (discord.token) active = "discord";
+        }
+
+        const hasToken =
+            (active === "telegram" && !!telegram.token) ||
+            (active === "discord" && !!discord.token);
+        const enabled = active && hasToken ? [active] : [];
 
         return {
+            active: enabled[0] || null,
             enabled,
             telegram,
+            discord,
         };
     }
 
@@ -73,7 +87,7 @@ class Config {
 
     get agent() {
         return {
-            maxIterations: parseInt(process.env.AGENT_MAX_ITERATIONS || "100", 10),
+            maxIterations: 500,
             // 실제 usage.input_tokens이 이 값의 85%를 넘으면 컨텍스트 압축 실행
             contextWindow: this._cache.model?.contextWindow || 100000,
         };

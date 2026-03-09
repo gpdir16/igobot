@@ -1,5 +1,6 @@
 import { readdirSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { join } from "node:path";
+import { TOOLS_DIR } from "./app-paths.js";
 import logger from "../utils/logger.js";
 
 // 동적 모듈 로더 (tools 디렉토리 자동 탐색/로드)
@@ -10,7 +11,7 @@ class ModuleLoader {
 
     // 기본 tools 디렉토리에서 모든 도구 모듈 로드
     async loadTools(toolsDir) {
-        const dir = toolsDir || resolve(process.cwd(), "src", "tools");
+        const dir = toolsDir || TOOLS_DIR;
         const files = readdirSync(dir).filter((f) => f.endsWith(".js") && f !== "index.js");
 
         for (const file of files) {

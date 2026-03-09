@@ -1,5 +1,6 @@
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { join } from "node:path";
+import { SKILLS_DIR } from "./app-paths.js";
 import logger from "../utils/logger.js";
 
 // SKILL.md 상단의 YAML frontmatter 파싱 (--- 블록)
@@ -34,7 +35,7 @@ class SkillLoader {
 
     // src/skills/ 하위 폴더를 스캔하여 SKILL.md 파일 로드
     async loadSkills(skillsDir) {
-        const dir = skillsDir || resolve(process.cwd(), "src", "skills");
+        const dir = skillsDir || SKILLS_DIR;
 
         if (!existsSync(dir)) {
             logger.warn(`Skills directory not found: ${dir}`);

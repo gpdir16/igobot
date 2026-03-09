@@ -1,7 +1,6 @@
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync, mkdirSync, unlinkSync } from "node:fs";
 import { resolve, join, relative } from "node:path";
-
-const WORKSPACE_DIR = resolve(process.cwd(), "data", "workspace");
+import { APP_ROOT, WORKSPACE_DIR } from "../core/app-paths.js";
 // 시작 시 workspace 디렉토리 보장
 if (!existsSync(WORKSPACE_DIR)) mkdirSync(WORKSPACE_DIR, { recursive: true });
 
@@ -20,7 +19,7 @@ function resolveManagedPath(filePath, inWorkspace = true) {
         return { absPath };
     }
 
-    const absPath = filePath.startsWith("/") ? resolve(filePath) : resolve(process.cwd(), filePath);
+    const absPath = filePath.startsWith("/") ? resolve(filePath) : resolve(APP_ROOT, filePath);
     return { absPath };
 }
 

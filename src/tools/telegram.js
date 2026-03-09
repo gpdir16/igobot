@@ -1,7 +1,6 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-
-const WORKSPACE_DIR = resolve(process.cwd(), "data", "workspace");
+import { WORKSPACE_DIR } from "../core/app-paths.js";
 
 // 경로 또는 URL을 sendPhoto/sendDocument에 넘길 수 있는 소스로 변환
 function resolveSource(filePath, fileName = "") {

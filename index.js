@@ -20,7 +20,7 @@ async function main() {
 
     const messengers = createEnabledMessengers();
     if (messengers.length === 0) {
-        throw new Error("No enabled messengers found. Check ENABLED_MESSENGERS or messenger tokens.");
+        throw new Error("No active messenger found. Check ACTIVE_MESSENGER and the selected messenger token.");
     }
 
     agent.registerMessengers(messengers);

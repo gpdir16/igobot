@@ -1,8 +1,12 @@
 import config from "../core/config.js";
 import logger from "../utils/logger.js";
+import DiscordMessenger from "./discord/messenger.js";
 import TelegramMessenger from "./telegram/messenger.js";
 
-const messengerFactories = new Map([["telegram", () => new TelegramMessenger()]]);
+const messengerFactories = new Map([
+    ["telegram", () => new TelegramMessenger()],
+    ["discord", () => new DiscordMessenger()],
+]);
 
 export function getRegisteredMessengerKeys() {
     return Array.from(messengerFactories.keys());
@@ -25,3 +29,4 @@ export function createEnabledMessengers() {
 }
 
 export { default as TelegramMessenger } from "./telegram/messenger.js";
+export { default as DiscordMessenger } from "./discord/messenger.js";

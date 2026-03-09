@@ -1,8 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, readdirSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { join } from "node:path";
+import { MEMORY_DIR } from "./app-paths.js";
 import logger from "../utils/logger.js";
-
-const MEMORY_DIR = resolve(process.cwd(), "data", "memory");
 
 // 메모리 시스템 (마크다운 파일 기반 저장/검색/삭제)
 class MemoryStore {

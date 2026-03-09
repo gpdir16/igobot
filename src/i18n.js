@@ -26,7 +26,7 @@ const translations = {
         welcome: {
             first_body:
                 "Welcome!\n" +
-                "This wizard will help you set up things like the Telegram API and Codex connection.\n" +
+                "This wizard will help you set up messenger bot tokens and the Codex connection.\n" +
                 "You can rerun this setup at any time with 'igobot setup'.\n\n" +
                 "Press Ctrl+C at any time to cancel.",
             first_title: "Welcome!",
@@ -37,9 +37,8 @@ const translations = {
 
         // 텔레그램 설정
         telegram: {
-            token_new: "[1/3] Enter your Telegram bot token (get it from @BotFather)",
-            token_existing: "[1/3] Enter your Telegram bot token from @BotFather (press Enter to keep the current value)",
-            token_required: "Bot token is required.",
+            token_new: "[2/4] Enter your Telegram bot token (get it from @BotFather)",
+            token_existing: "[2/4] Enter your Telegram bot token from @BotFather (press Enter to keep the current value)",
             token_invalid: "Invalid bot token format. (e.g. 123456789:ABC...)",
             approval_flow_title: "Telegram Access",
             approval_flow:
@@ -47,13 +46,26 @@ const translations = {
                 "When a new Telegram account sends a message, igobot creates a unique approval code.\n" +
                 "Approve that account from this machine with: igobot ok {code}",
         },
+        discord: {
+            token_new: "[2/4] Enter your Discord bot token",
+            token_existing: "[2/4] Enter your Discord bot token (press Enter to keep the current value)",
+            token_invalid: "Discord bot token looks too short.",
+            approval_flow_title: "Discord Access",
+            approval_flow:
+                "When a new Discord account sends a message, igobot creates a unique approval code.\n" +
+                "Approve that account from this machine with: igobot ok {code}\n\n" +
+                "For Discord bots, enable the Message Content intent in the Discord Developer Portal.",
+        },
+        messengers: {
+            select: "[1/4] Choose the messenger to use",
+            token_ready: "token saved",
+            token_missing: "no token yet",
+            selected_token_required: "{messenger} bot token is required for the selected messenger.",
+        },
 
         // 에이전트 설정 (온보딩용 — 런타임 agent.*와 구분)
         agent_setup: {
-            max_iter: "[2/3] Max agent iterations (LLM call limit per task)",
-            max_iter_invalid: "Enter a number of 1 or more.",
-            max_iter_too_large: "Too large. Recommended range: 1–1000.",
-            log_level: "Select log level",
+            log_level: "[3/4] Select log level",
             log_hints: {
                 error: "Critical issues only (recommended)",
                 warn: "Log all issues",
@@ -70,8 +82,8 @@ const translations = {
 
         // Codex 로그인 (온보딩)
         login: {
-            confirm_existing: "[3/3] Codex auth already exists. Re-login?",
-            confirm_new: "[3/3] Proceed with Codex OAuth login? (ChatGPT Plus/Pro required)",
+            confirm_existing: "[4/4] Codex auth already exists. Re-login?",
+            confirm_new: "[4/4] Proceed with Codex OAuth login? (ChatGPT Plus/Pro required)",
             note_body:
                 "Open the URL in your browser and\n" +
                 "sign in with your ChatGPT account.\n\n" +
@@ -92,6 +104,21 @@ const translations = {
         cancel: "Setup cancelled.",
         error_prefix: "Error during setup",
 
+        access: {
+            pending_short: "Approval is still required for this account.",
+            request_title: "🔐 Approval is required for this account for security.",
+            request_body:
+                "This looks like an account igobot has not seen before.\n" +
+                "For security, approval is required before using igobot.\n\n" +
+                "Run the command below in the terminal on the computer where igobot is running:\n" +
+                "igobot ok {code}\n\n" +
+                "After approval, you are ready to chat with igobot.",
+            approved:
+                "✅ This account has been approved.\n\n" +
+                "You are ready to chat with igobot.\n" +
+                "Send any message to start.",
+        },
+
         // ── 봇 런타임 메시지 ──────────────────────────────────────────────
         bot: {
             token_missing: "TELEGRAM_BOT_TOKEN is not set.",
@@ -108,18 +135,6 @@ const translations = {
             yolo_on: "🚀 YOLO mode ON",
             denied: "❌ Denied",
             error: "⚠️ Error: {msg}",
-            auth_pending_short: "Approval is still required for this Telegram account.",
-            auth_request_message:
-                "<b>🔐 Approval is required for this account for security.</b>\n\n" +
-                "This looks like a Telegram account igobot has not seen before.\n" +
-                "For security, approval is required before using igobot.\n\n" +
-                "Run the command below in the terminal on the computer where igobot is running:\n" +
-                "<code>igobot ok {code}</code>\n\n" +
-                "After approval, you can chat, work, and build with igobot.",
-            auth_approved:
-                "<b>✅ This account has been approved.</b>\n\n" +
-                "You are ready to chat with igobot.\n" +
-                "Send any message to start.",
             photo: "[Photo]",
             document: "[Document: {name}]",
             sticker: "[Sticker: {emoji}]",
@@ -135,6 +150,9 @@ const translations = {
             tool_log_title: "Tool History",
             tool_log_args: "Args:",
             tool_log_result: "Result:",
+        },
+        discord_bot: {
+            token_missing: "DISCORD_BOT_TOKEN is not set.",
         },
 
         // ── 에이전트 런타임 메시지 ────────────────────────────────────────
@@ -171,11 +189,11 @@ const translations = {
         cli: {
             first_run: "\nFirst run detected. Starting setup...\n",
             approve_usage: "Usage: igobot ok <approval-code>",
-            approve_not_found: "No pending Telegram approval was found for code: {code}",
+            approve_not_found: "No pending messenger approval was found for code: {code}",
             approve_already_done: "This approval code was already used: {code}",
-            approve_success: "Approved Telegram account: {account} (userId: {userId})",
+            approve_success: "Approved {messenger} account: {account} (userId: {userId})",
             approve_success_next: "This account can now send messages to igobot.",
-            approve_notify_failed: "Approval succeeded, but the Telegram confirmation message could not be sent.",
+            approve_notify_failed: "Approval succeeded, but the confirmation message could not be sent.",
         },
 
         // ── 시스템 프롬프트 (LLM 지시문) ─────────────────────────────────
@@ -184,7 +202,7 @@ Use the provided tools freely to fulfill user requests.
 
 **Important — Runtime Environment:**
 - This is an agent running on a server. There is no GUI or screen.
-- Everything you want to show the user must be sent as a Telegram message.
+- Everything you want to show the user must be sent through the active messenger.
 - Code execution results, file contents, etc. should be delivered as text.
 - **For file operations (write_file, delete_file), use \`inWorkspace: true\` for normal data/workspace/ edits.** Set \`inWorkspace: false\` only when you must edit a path outside the workspace.
 - If the user sends an image, you can see it directly. Image analysis is supported.
@@ -194,8 +212,8 @@ Available tools:
 - read_file: Read file contents
 - list_directory: List directory contents
 - search_files: Search for text in files
-- write_file: Create/modify files (\`inWorkspace:true\` => data/workspace/ relative, \`false\` => cwd-relative or absolute path)
-- delete_file: Delete files (\`inWorkspace:true\` => data/workspace/ relative, \`false\` => cwd-relative or absolute path)
+- write_file: Create/modify files (\`inWorkspace:true\` => data/workspace/ relative, \`false\` => project-root-relative or absolute path)
+- delete_file: Delete files (\`inWorkspace:true\` => data/workspace/ relative, \`false\` => project-root-relative or absolute path)
 - browser_fetch: Fetch web page content
 - browser_interact: Interact with web pages
 - send_photo: Send a local file or URL to the user as a photo
@@ -235,7 +253,7 @@ Web scraping rules:
         welcome: {
             first_body:
                 "환영합니다!\n" +
-                "이 마법사는 Telegram API와 Codex 연결 등의 작업을 도와줍니다.\n" +
+                "이 마법사는 메신저 봇 토큰과 Codex 연결 설정을 도와줍니다.\n" +
                 "언제든지 'igobot setup'을 입력해 이 설정을 다시 진행할 수 있습니다.\n\n" +
                 "도중에 중지하려면 Ctrl+C를 누르십시오.",
             first_title: "환영합니다!",
@@ -246,9 +264,8 @@ Web scraping rules:
 
         // 텔레그램 설정
         telegram: {
-            token_new: "[1/3] @BotFather에서 발급한 Telegram 봇 토큰을 입력하세요",
-            token_existing: "[1/3] @BotFather에서 발급한 Telegram 봇 토큰을 입력하세요 (Enter로 기존 값 유지)",
-            token_required: "봇 토큰은 필수입니다.",
+            token_new: "[2/4] @BotFather에서 발급한 Telegram 봇 토큰을 입력하세요",
+            token_existing: "[2/4] @BotFather에서 발급한 Telegram 봇 토큰을 입력하세요 (Enter로 기존 값 유지)",
             token_invalid: "올바르지 않은 봇 토큰 형식입니다. (예: 123456789:ABC...)",
             approval_flow_title: "텔레그램 접근 승인",
             approval_flow:
@@ -256,13 +273,26 @@ Web scraping rules:
                 "새 텔레그램 계정이 메시지를 보내면 igobot이 고유 승인 코드를 발급합니다.\n" +
                 "이 컴퓨터에서 `igobot ok {코드}`를 실행해 해당 계정을 승인하세요.",
         },
+        discord: {
+            token_new: "[2/4] Discord 봇 토큰을 입력하세요",
+            token_existing: "[2/4] Discord 봇 토큰을 입력하세요 (Enter로 기존 값 유지)",
+            token_invalid: "Discord 봇 토큰이 너무 짧아 보입니다.",
+            approval_flow_title: "디스코드 접근 승인",
+            approval_flow:
+                "새 Discord 계정이 메시지를 보내면 igobot이 고유 승인 코드를 발급합니다.\n" +
+                "이 컴퓨터에서 `igobot ok {코드}`를 실행해 해당 계정을 승인하세요.\n\n" +
+                "Discord Developer Portal에서 Message Content intent도 켜주세요.",
+        },
+        messengers: {
+            select: "[1/4] 사용할 메신저를 선택하세요",
+            token_ready: "토큰 있음",
+            token_missing: "토큰 없음",
+            selected_token_required: "선택한 메신저({messenger})의 봇 토큰이 필요합니다.",
+        },
 
         // 에이전트 설정 (온보딩용)
         agent_setup: {
-            max_iter: "[2/3] 에이전트 최대 반복 횟수 (작업 하나당 LLM 호출 한도)",
-            max_iter_invalid: "1 이상의 숫자를 입력하세요.",
-            max_iter_too_large: "너무 큰 값입니다. 1~1000 사이를 권장합니다.",
-            log_level: "로그 레벨을 선택하세요",
+            log_level: "[3/4] 로그 레벨을 선택하세요",
             log_hints: {
                 error: "심각한 문제만 기록 (권장)",
                 warn: "모든 문제를 기록",
@@ -279,8 +309,8 @@ Web scraping rules:
 
         // Codex 로그인 (온보딩)
         login: {
-            confirm_existing: "[3/3] Codex 인증이 이미 있습니다. 다시 로그인하시겠습니까?",
-            confirm_new: "[3/3] Codex OAuth 로그인을 진행하시겠습니까? (ChatGPT Plus/Pro 계정 필요)",
+            confirm_existing: "[4/4] Codex 인증이 이미 있습니다. 다시 로그인하시겠습니까?",
+            confirm_new: "[4/4] Codex OAuth 로그인을 진행하시겠습니까? (ChatGPT Plus/Pro 계정 필요)",
             note_body:
                 "브라우저에서 열리는 URL에 접속하여\n" +
                 "ChatGPT 계정으로 로그인해주세요.\n\n" +
@@ -301,6 +331,21 @@ Web scraping rules:
         cancel: "설정을 취소했습니다.",
         error_prefix: "설정 중 오류 발생",
 
+        access: {
+            pending_short: "이 계정은 아직 승인이 필요합니다.",
+            request_title: "🔐 보안을 위해 이 계정에 대한 승인이 필요합니다.",
+            request_body:
+                "이 계정은 처음 보는 계정인 것 같습니다.\n" +
+                "보안을 위해 igobot을 사용하기 전에 승인이 필요합니다.\n\n" +
+                "igobot이 실행 중인 컴퓨터의 터미널에서 아래 명령어를 실행하세요:\n" +
+                "igobot ok {code}\n\n" +
+                "승인 후 igobot과 대화할 수 있습니다.",
+            approved:
+                "✅ 이 계정이 승인되었습니다.\n\n" +
+                "이제 igobot과 대화할 준비가 되었습니다.\n" +
+                "아무 메시지나 보내서 시작하세요.",
+        },
+
         // ── 봇 런타임 메시지 ──────────────────────────────────────────────
         bot: {
             token_missing: "TELEGRAM_BOT_TOKEN이 설정되지 않았습니다.",
@@ -317,18 +362,6 @@ Web scraping rules:
             yolo_on: "🚀 YOLO 모드 ON",
             denied: "❌ 거부됨",
             error: "⚠️ 오류: {msg}",
-            auth_pending_short: "이 텔레그램 계정은 아직 승인이 필요합니다.",
-            auth_request_message:
-                "<b>🔐 보안을 위해 이 계정에 대한 승인이 필요합니다.</b>\n\n" +
-                "이 계정은 처음 보는 계정인것 같습니다.\n" +
-                "보안을 위해 igobot을 이용하려면 승인이 필요합니다.\n\n" +
-                "igobot이 실행중인 컴퓨터의 터미널에 아래 명령어를 실행하세요:\n" +
-                "<code>igobot ok {code}</code>\n\n" +
-                "승인 후 igobot과 함께 대화하고, 작업하고, 개발할수 있습니다.",
-            auth_approved:
-                "<b>✅ 이 계정이 승인되었습니다.</b>\n\n" +
-                "igobot과 함께 대화할 준비가 되었습니다.\n" +
-                "아무 메시지나 보내서 시작하세요.",
             photo: "[사진]",
             document: "[문서: {name}]",
             sticker: "[스티커: {emoji}]",
@@ -344,6 +377,9 @@ Web scraping rules:
             tool_log_title: "도구 사용 기록",
             tool_log_args: "인자:",
             tool_log_result: "결과:",
+        },
+        discord_bot: {
+            token_missing: "DISCORD_BOT_TOKEN이 설정되지 않았습니다.",
         },
 
         // ── 에이전트 런타임 메시지 ────────────────────────────────────────
@@ -380,11 +416,11 @@ Web scraping rules:
         cli: {
             first_run: "\n첫 실행입니다. 설정을 시작합니다...\n",
             approve_usage: "사용법: igobot ok <인증코드>",
-            approve_not_found: "해당 코드의 대기 중인 텔레그램 승인 요청이 없습니다: {code}",
+            approve_not_found: "해당 코드의 대기 중인 메신저 승인 요청이 없습니다: {code}",
             approve_already_done: "이미 사용된 승인 코드입니다: {code}",
-            approve_success: "텔레그램 계정을 승인했습니다: {account} (userId: {userId})",
+            approve_success: "{messenger} 계정을 승인했습니다: {account} (userId: {userId})",
             approve_success_next: "이제 이 계정이 igobot에 메시지를 보낼 수 있습니다.",
-            approve_notify_failed: "승인은 완료됐지만 텔레그램 확인 메시지 전송에는 실패했습니다.",
+            approve_notify_failed: "승인은 완료됐지만 확인 메시지 전송에는 실패했습니다.",
         },
 
         // ── 시스템 프롬프트 (LLM 지시문) ─────────────────────────────────
@@ -393,7 +429,7 @@ Web scraping rules:
 
 **중요 — 실행 환경:**
 - 이것은 서버에서 실행되는 에이전트입니다. GUI나 화면이 없습니다.
-- 사용자에게 보여줄 모든 내용은 반드시 텔레그램 메시지로 전송해야 합니다.
+- 사용자에게 보여줄 모든 내용은 반드시 현재 메신저를 통해 전송해야 합니다.
 - 코드 실행 결과, 파일 내용 등도 사용자에게 텍스트로 전달하세요.
 - **파일 작업(write_file, delete_file)은 기본적으로 \`inWorkspace: true\`로 \`data/workspace/\` 안에서 처리하세요.** 워크스페이스 밖 경로를 꼭 수정해야 할 때만 \`inWorkspace: false\`를 사용하세요.
 - 사용자가 이미지를 보내면 직접 볼 수 있습니다. 이미지 분석이 가능합니다.
@@ -403,8 +439,8 @@ Web scraping rules:
 - read_file: 파일 내용 읽기
 - list_directory: 디렉토리 내용 목록
 - search_files: 파일에서 텍스트 검색
-- write_file: 파일 생성/수정 (\`inWorkspace:true\`면 data/workspace/ 기준, \`false\`면 현재 작업 디렉토리 기준 상대 경로 또는 절대 경로)
-- delete_file: 파일 삭제 (\`inWorkspace:true\`면 data/workspace/ 기준, \`false\`면 현재 작업 디렉토리 기준 상대 경로 또는 절대 경로)
+- write_file: 파일 생성/수정 (\`inWorkspace:true\`면 data/workspace/ 기준, \`false\`면 프로젝트 루트 기준 상대 경로 또는 절대 경로)
+- delete_file: 파일 삭제 (\`inWorkspace:true\`면 data/workspace/ 기준, \`false\`면 프로젝트 루트 기준 상대 경로 또는 절대 경로)
 - browser_fetch: 웹페이지 내용 가져오기
 - browser_interact: 웹페이지 인터랙션
 - send_photo: 로컬 파일 또는 URL을 사용자에게 사진으로 전송

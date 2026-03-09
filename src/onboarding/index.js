@@ -1,7 +1,6 @@
 import {
     intro,
     outro,
-    text,
     password,
     confirm,
     select,
@@ -40,14 +39,14 @@ function writeEnv(env) {
         "# igobot Configuration",
         "# WARNING: Never share this file externally!",
         "",
-        "# Enabled messengers (comma-separated; current implementation: telegram)",
-        `ENABLED_MESSENGERS=${env.ENABLED_MESSENGERS ?? "telegram"}`,
+        "# Active messenger (supported: telegram, discord)",
+        `ACTIVE_MESSENGER=${env.ACTIVE_MESSENGER ?? ""}`,
         "",
         "# Telegram bot token (from @BotFather)",
         `TELEGRAM_BOT_TOKEN=${env.TELEGRAM_BOT_TOKEN ?? ""}`,
         "",
-        "# Agent settings",
-        `AGENT_MAX_ITERATIONS=${env.AGENT_MAX_ITERATIONS ?? "100"}`,
+        "# Discord bot token (from Discord Developer Portal)",
+        `DISCORD_BOT_TOKEN=${env.DISCORD_BOT_TOKEN ?? ""}`,
         "",
         "# Log level: error, warn, info, debug",
         `LOG_LEVEL=${env.LOG_LEVEL ?? "error"}`,
@@ -62,7 +61,11 @@ function writeEnv(env) {
 export function needsOnboarding() {
     if (!existsSync(ENV_FILE)) return true;
     const env = parseEnv(readFileSync(ENV_FILE, "utf-8"));
-    return !env.TELEGRAM_BOT_TOKEN;
+    const activeMessenger = env.ACTIVE_MESSENGER;
+    if (!activeMessenger) return true;
+    if (activeMessenger === "telegram") return !env.TELEGRAM_BOT_TOKEN;
+    if (activeMessenger === "discord") return !env.DISCORD_BOT_TOKEN;
+    return true;
 }
 
 // ── cancel 헬퍼: isCancel이면 메시지 출력 후 종료 ────────────────────────────
@@ -104,44 +107,77 @@ export async function runOnboarding({ isFirstRun = false } = {}) {
         note(t("welcome.first_body"), t("welcome.first_title"));
     } else {
         note(
-            existingEnv.TELEGRAM_BOT_TOKEN
+            existingEnv.TELEGRAM_BOT_TOKEN || existingEnv.DISCORD_BOT_TOKEN
                 ? t("welcome.reconfigure_body")
                 : t("welcome.fresh_body"),
             t("welcome.title"),
         );
     }
 
-    // ── [1/3] 텔레그램 봇 토큰 ───────────────────────────────────────────────
-    const hasToken = !!existingEnv.TELEGRAM_BOT_TOKEN;
-    const botToken = abortIfCancel(
-        await password({
-            message: hasToken ? t("telegram.token_existing") : t("telegram.token_new"),
-            validate(value) {
-                if (!value && !hasToken) return t("telegram.token_required");
-                if (value && !/^\d+:[A-Za-z0-9_-]{35,}$/.test(value)) {
-                    return t("telegram.token_invalid");
-                }
-            },
+    const existingActiveMessenger =
+        existingEnv.ACTIVE_MESSENGER ||
+        (existingEnv.TELEGRAM_BOT_TOKEN ? "telegram" : existingEnv.DISCORD_BOT_TOKEN ? "discord" : "telegram");
+
+    // ── [1/4] 사용할 메신저 선택 ─────────────────────────────────────────────
+    const activeMessenger = abortIfCancel(
+        await select({
+            message: t("messengers.select"),
+            options: [
+                {
+                    value: "telegram",
+                    label: "Telegram",
+                    hint: existingEnv.TELEGRAM_BOT_TOKEN ? t("messengers.token_ready") : t("messengers.token_missing"),
+                },
+                {
+                    value: "discord",
+                    label: "Discord",
+                    hint: existingEnv.DISCORD_BOT_TOKEN ? t("messengers.token_ready") : t("messengers.token_missing"),
+                },
+            ],
+            initialValue: existingActiveMessenger,
         }),
         t,
     );
 
-    note(t("telegram.approval_flow"), t("telegram.approval_flow_title"));
+    let resolvedTelegramToken = existingEnv.TELEGRAM_BOT_TOKEN || "";
+    let resolvedDiscordToken = existingEnv.DISCORD_BOT_TOKEN || "";
 
-    // ── [2/3] 에이전트 설정 ──────────────────────────────────────────────────
-    const maxIterations = abortIfCancel(
-        await text({
-            message: t("agent_setup.max_iter"),
-            placeholder: "100",
-            defaultValue: existingEnv.AGENT_MAX_ITERATIONS || "100",
-            validate(value) {
-                const n = parseInt(value, 10);
-                if (isNaN(n) || n < 1) return t("agent_setup.max_iter_invalid");
-                if (n > 1000) return t("agent_setup.max_iter_too_large");
-            },
-        }),
-        t,
-    );
+    // ── [2/4] 선택한 메신저 토큰 ─────────────────────────────────────────────
+    if (activeMessenger === "telegram") {
+        const hasTelegramToken = !!existingEnv.TELEGRAM_BOT_TOKEN;
+        const telegramToken = abortIfCancel(
+            await password({
+                message: hasTelegramToken ? t("telegram.token_existing") : t("telegram.token_new"),
+                validate(value) {
+                    if (!value && !hasTelegramToken) return t("messengers.selected_token_required", { messenger: "Telegram" });
+                    if (value && !/^\d+:[A-Za-z0-9_-]{35,}$/.test(value)) {
+                        return t("telegram.token_invalid");
+                    }
+                },
+            }),
+            t,
+        );
+
+        resolvedTelegramToken = telegramToken || existingEnv.TELEGRAM_BOT_TOKEN || "";
+        note(t("telegram.approval_flow"), t("telegram.approval_flow_title"));
+    } else if (activeMessenger === "discord") {
+        const hasDiscordToken = !!existingEnv.DISCORD_BOT_TOKEN;
+        const discordToken = abortIfCancel(
+            await password({
+                message: hasDiscordToken ? t("discord.token_existing") : t("discord.token_new"),
+                validate(value) {
+                    if (!value && !hasDiscordToken) return t("messengers.selected_token_required", { messenger: "Discord" });
+                    if (value && value.length < 30) {
+                        return t("discord.token_invalid");
+                    }
+                },
+            }),
+            t,
+        );
+
+        resolvedDiscordToken = discordToken || existingEnv.DISCORD_BOT_TOKEN || "";
+        note(t("discord.approval_flow"), t("discord.approval_flow_title"));
+    }
 
     const logHints = t("agent_setup.log_hints");
     const logLevel = abortIfCancel(
@@ -163,16 +199,16 @@ export async function runOnboarding({ isFirstRun = false } = {}) {
     s.start(t("save.saving"));
 
     writeEnv({
-        ENABLED_MESSENGERS: existingEnv.ENABLED_MESSENGERS || "telegram",
-        TELEGRAM_BOT_TOKEN: botToken || existingEnv.TELEGRAM_BOT_TOKEN,
-        AGENT_MAX_ITERATIONS: maxIterations,
+        ACTIVE_MESSENGER: activeMessenger,
+        TELEGRAM_BOT_TOKEN: resolvedTelegramToken,
+        DISCORD_BOT_TOKEN: resolvedDiscordToken,
         LOG_LEVEL: logLevel,
         LANGUAGE: langValue,
     });
 
     s.stop(t("save.saved"));
 
-    // ── [3/3] Codex OAuth 로그인 ──────────────────────────────────────────────
+    // ── [4/4] Codex OAuth 로그인 ──────────────────────────────────────────────
     const alreadyLoggedIn = existsSync(getCodexAuthFile());
     const doLogin = abortIfCancel(
         await confirm({

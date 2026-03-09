@@ -39,7 +39,7 @@ async function runCommand(cmd, args) {
             await runSetup();
             break;
         case "ok":
-            await approveTelegramAccess(args);
+            await approveMessengerAccess(args);
             break;
         case "help":
         case "--help":
@@ -72,14 +72,14 @@ Commands:
   status    Check igobot status
   logs      View logs (default: last 50 lines)
             --follow, -f: Follow log output
-  ok        Approve a pending Telegram access code
+  ok        Approve a pending messenger access code
   login     Codex OAuth login (unofficial)
   help      Show this help
 
 Examples:
   igobot setup        # Configure igobot (run this first!)
   igobot start        # Start in background
-  igobot ok ABC12345  # Approve a Telegram account
+  igobot ok ABC12345  # Approve a messenger account
   igobot status       # Check status
   igobot logs -f      # Follow logs in real-time
   igobot stop         # Stop the bot
@@ -263,10 +263,11 @@ async function runSetup() {
     process.exit(0);
 }
 
-async function approveTelegramAccess(args) {
+async function approveMessengerAccess(args) {
     await import("dotenv/config");
     const { getT } = await import("../src/i18n.js");
     const { approveTelegramAccessCode, formatTelegramAccountLabel } = await import("../src/messengers/telegram/auth-store.js");
+    const { approveDiscordAccessCode, formatDiscordAccountLabel } = await import("../src/messengers/discord/auth-store.js");
 
     const t = getT();
     const code = args[0];
@@ -276,32 +277,46 @@ async function approveTelegramAccess(args) {
         process.exit(1);
     }
 
-    const result = approveTelegramAccessCode(code);
+    const telegramResult = approveTelegramAccessCode(code);
+    const discordResult = approveDiscordAccessCode(code);
 
-    if (result.status === "invalid_code") {
+    if (telegramResult.status === "invalid_code" && discordResult.status === "invalid_code") {
         console.error(t("cli.approve_usage"));
         process.exit(1);
     }
 
-    if (result.status === "not_found") {
+    if (telegramResult.status === "not_found" && discordResult.status === "not_found") {
         console.error(t("cli.approve_not_found", { code }));
         process.exit(1);
     }
 
-    if (result.status === "already_approved") {
+    if (telegramResult.status === "already_approved" || discordResult.status === "already_approved") {
         console.log(t("cli.approve_already_done", { code }));
         return;
     }
 
-    console.log(
-        t("cli.approve_success", {
-            account: formatTelegramAccountLabel(result.authorizedUser),
-            userId: result.authorizedUser.userId,
-        }),
-    );
+    let result;
+    let messengerName;
+    let accountLabel;
+
+    if (telegramResult.status === "approved") {
+        result = telegramResult;
+        messengerName = "Telegram";
+        accountLabel = formatTelegramAccountLabel(result.authorizedUser);
+    } else if (discordResult.status === "approved") {
+        result = discordResult;
+        messengerName = "Discord";
+        accountLabel = formatDiscordAccountLabel(result.authorizedUser);
+    } else {
+        console.error(t("cli.approve_not_found", { code }));
+        process.exit(1);
+    }
+
+    console.log(t("cli.approve_success", { messenger: messengerName, account: accountLabel, userId: result.authorizedUser.userId }));
     console.log(t("cli.approve_success_next"));
 
-    const notified = await sendTelegramApprovalConfirmation(result.request);
+    const shouldNotify = messengerName === "Telegram";
+    const notified = shouldNotify ? await sendTelegramApprovalConfirmation(result.request) : true;
     if (!notified) {
         console.warn(t("cli.approve_notify_failed"));
     }
@@ -320,7 +335,7 @@ async function sendTelegramApprovalConfirmation(request) {
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
                 chat_id: request.chatId,
-                text: t("bot.auth_approved"),
+                text: t("access.approved"),
                 parse_mode: "HTML",
             }),
         });
