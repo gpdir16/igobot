@@ -195,13 +195,16 @@ const translations = {
             approve_success_next: "This account can now send messages to igobot.",
             approve_notify_failed: "Approval succeeded, but the confirmation message could not be sent.",
         },
+        security: {
+            screenshot_notice: "Security notice: A screenshot was captured through igobot and sent to the user.",
+        },
 
         // ── 시스템 프롬프트 (LLM 지시문) ─────────────────────────────────
         system_prompt: `You are an autonomous AI agent called igobot.
 Use the provided tools freely to fulfill user requests.
 
 **Important — Runtime Environment:**
-- This is an agent running on a server. There is no GUI or screen.
+- This is an agent running on a server or desktop host. GUI/screen access may be unavailable depending on the environment.
 - Everything you want to show the user must be sent through the active messenger.
 - Code execution results, file contents, etc. should be delivered as text.
 - **For file operations (write_file, delete_file), use \`inWorkspace: true\` for normal data/workspace/ edits.** Set \`inWorkspace: false\` only when you must edit a path outside the workspace.
@@ -217,6 +220,7 @@ Available tools:
 - browser_fetch: Fetch web page content
 - browser_interact: Interact with web pages
 - browser_screenshot: Capture webpage screenshots as PNG files
+- screenshot: Capture the computer screen as a PNG file
 - send_photo: Send a local file or URL to the user as a photo
 - send_document: Send a local file or URL to the user as a document
 - memory_save: Save important information to persistent memory (markdown file)
@@ -423,13 +427,16 @@ Web scraping rules:
             approve_success_next: "이제 이 계정이 igobot에 메시지를 보낼 수 있습니다.",
             approve_notify_failed: "승인은 완료됐지만 확인 메시지 전송에는 실패했습니다.",
         },
+        security: {
+            screenshot_notice: "보안 알림: igobot을 통해 스크린샷이 촬영되었으며 사용자에게 전송되었습니다.",
+        },
 
         // ── 시스템 프롬프트 (LLM 지시문) ─────────────────────────────────
         system_prompt: `당신은 igobot이라는 자율 AI 에이전트입니다.
 사용자의 요청을 수행하기 위해 제공된 도구들을 자유롭게 사용하세요.
 
 **중요 — 실행 환경:**
-- 이것은 서버에서 실행되는 에이전트입니다. GUI나 화면이 없습니다.
+- 이것은 서버 또는 데스크톱 호스트에서 실행되는 에이전트입니다. 환경에 따라 GUI/화면 접근이 없을 수 있습니다.
 - 사용자에게 보여줄 모든 내용은 반드시 현재 메신저를 통해 전송해야 합니다.
 - 코드 실행 결과, 파일 내용 등도 사용자에게 텍스트로 전달하세요.
 - **파일 작업(write_file, delete_file)은 기본적으로 \`inWorkspace: true\`로 \`data/workspace/\` 안에서 처리하세요.** 워크스페이스 밖 경로를 꼭 수정해야 할 때만 \`inWorkspace: false\`를 사용하세요.
@@ -445,6 +452,7 @@ Web scraping rules:
 - browser_fetch: 웹페이지 내용 가져오기
 - browser_interact: 웹페이지 인터랙션
 - browser_screenshot: 웹페이지 스크린샷을 PNG 파일로 저장
+- screenshot: 컴퓨터 화면을 PNG 파일로 저장
 - send_photo: 로컬 파일 또는 URL을 사용자에게 사진으로 전송
 - send_document: 로컬 파일 또는 URL을 사용자에게 문서로 전송
 - memory_save: 중요 정보를 영구 메모리에 저장 (마크다운 파일)
