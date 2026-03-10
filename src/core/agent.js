@@ -5,6 +5,7 @@ import memoryStore from "./memory.js";
 import { needsCompression, compressContext } from "./context-compressor.js";
 import logger from "../utils/logger.js";
 import { getT } from "../i18n.js";
+import { buildAgentInstructions } from "./prompt-loader.js";
 
 // 에이전트 코어 (LLM-도구 루프, 스트리밍, 컨텍스트 압축, 메모리)
 class Agent {
@@ -14,8 +15,6 @@ class Agent {
         this.conversations = new Map();
         this.pendingMessages = new Map();
         this.running = new Map();
-        // sessionId → Map<skillName, skillBody> — 대화별 로드된 스킬 추적
-        this.loadedSkills = new Map();
 
         this.messengers = new Map();
         // 스킬 로더 (index.js에서 주입)
@@ -68,7 +67,6 @@ class Agent {
         const sessionId = chatId === null ? sessionIdOrMessengerKey : this.getSessionId(sessionIdOrMessengerKey, chatId);
         this.conversations.delete(sessionId);
         this.pendingMessages.delete(sessionId);
-        this.loadedSkills.delete(sessionId);
         this.llm.resetSession();
         logger.info(`Conversation reset: ${sessionId}`);
     }
@@ -190,19 +188,6 @@ class Agent {
 
         messages.push({ role: "user", content: userContent });
 
-        // 메모리를 시스템 프롬프트에 포함 (모든 메모리 파일 내용 주입)
-        const memoryContext = memoryStore.getAllForContext();
-
-        // 스킬 레지스트리 섹션 (항상 포함 — 이름+설명만, 토큰 최소화)
-        let skillRegistrySection = "";
-        if (this._skillLoader) {
-            const skillList = this._skillLoader.getSkillList();
-            if (skillList.length > 0) {
-                const listStr = skillList.map((skill) => `- **${skill.name}**: ${skill.description}`).join("\n");
-                skillRegistrySection = `\n\n---\n# 스킬 시스템\n필요한 스킬은 \`list_skills\`로 목록을 확인하고 \`load_skill\`로 로드하세요.\n\n${listStr}`;
-            }
-        }
-
         const tools = this.moduleLoader.getToolSchemas();
         const maxIterations = config.agent.maxIterations;
         let iteration = 0;
@@ -232,17 +217,15 @@ class Agent {
             iteration++;
             logger.info(`Agent loop ${iteration}/${maxIterations}`);
 
-            // 매 이터레이션마다 instructions 재구성 (스킬이 로드될 때 즉시 반영)
-            const chatLoadedSkills = this.loadedSkills.get(sessionId);
-            let loadedSkillSection = "";
-            if (chatLoadedSkills && chatLoadedSkills.size > 0) {
-                const sections = [];
-                for (const [name, body] of chatLoadedSkills) {
-                    sections.push(`## 스킬: ${name}\n${body}`);
-                }
-                loadedSkillSection = `\n\n---\n# 로드된 스킬\n\n${sections.join("\n\n---\n\n")}`;
-            }
-            const instructions = t("system_prompt") + skillRegistrySection + loadedSkillSection + memoryContext;
+            const instructions = buildAgentInstructions({
+                tools: tools.map((tool) => ({
+                    name: tool.name,
+                    description: tool.description,
+                    requiresApproval: !!this.moduleLoader.getTool(tool.name)?.requiresApproval,
+                })),
+                skills: this._skillLoader?.getSkillList() || [],
+                memoryContext: memoryStore.getAllForPrompt(),
+            });
 
             // 이번 모델 호출 전에 도착한 메시지를 우선 컨텍스트에 반영
             const preDrained = this._drainPendingMessages(sessionId, messages);
@@ -368,16 +351,7 @@ class Agent {
                             });
 
                             let resultStr;
-                            if (result && typeof result === "object" && result.__skillContent) {
-                                if (!this.loadedSkills.has(sessionId)) {
-                                    this.loadedSkills.set(sessionId, new Map());
-                                }
-                                this.loadedSkills.get(sessionId).set(result.__skillName, result.__skillContent);
-                                resultStr = result.message;
-                                logger.info(`[${sessionId}] Skill loaded: ${result.__skillName}`);
-                            } else {
-                                resultStr = typeof result === "string" ? result : JSON.stringify(result);
-                            }
+                            resultStr = typeof result === "string" ? result : JSON.stringify(result);
 
                             messages.push({ role: "tool", call_id: toolCall.call_id, content: resultStr });
                             toolHistory.push({ name: toolCall.name, args, result: resultStr });

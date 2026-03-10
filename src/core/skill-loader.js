@@ -27,10 +27,10 @@ function parseFrontmatter(content) {
     return { meta, body };
 }
 
-// src/skills/ 하위 폴더를 스캔하여 SKILL.md 파일을 읽어 에이전트 지시문으로 주입하는 로더
+// src/skills/ 하위 폴더를 스캔하여 SKILL.md 메타데이터를 관리하는 로더
 class SkillLoader {
     constructor() {
-        this.skills = new Map(); // name → { meta, body, rawContent }
+        this.skills = new Map(); // name → { meta, body, rawContent, path }
     }
 
     // src/skills/ 하위 폴더를 스캔하여 SKILL.md 파일 로드
@@ -57,7 +57,7 @@ class SkillLoader {
                 const rawContent = readFileSync(skillMdPath, "utf-8");
                 const { meta, body } = parseFrontmatter(rawContent);
                 const name = meta.name || entry.name;
-                this.skills.set(name, { meta, body, rawContent });
+                this.skills.set(name, { meta, body, rawContent, path: skillMdPath });
                 logger.info(`Skill loaded: ${name} [${skillMdPath}]`);
             } catch (err) {
                 logger.error(`Failed to load skill: ${entry.name}`, err);
@@ -70,6 +70,7 @@ class SkillLoader {
         return Array.from(this.skills.entries()).map(([name, skill]) => ({
             name,
             description: skill.meta.description || name,
+            path: skill.path,
         }));
     }
 
@@ -83,16 +84,6 @@ class SkillLoader {
         return this.skills.has(name);
     }
 
-    // 에이전트 시스템 프롬프트에 주입할 스킬 지시문 반환 (레거시 — 사용 중단 예정)
-    getSystemPromptSection() {
-        if (this.skills.size === 0) return null;
-
-        const sections = [];
-        for (const [name, skill] of this.skills) {
-            sections.push(`## Skill: ${name}\n${skill.body}`);
-        }
-        return `\n\n---\n# Available Skills\n\n${sections.join("\n\n---\n\n")}`;
-    }
 }
 
 export default SkillLoader;

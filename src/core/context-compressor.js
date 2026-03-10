@@ -63,8 +63,8 @@ export async function compressContext(messages, llmClient, keepRecent = 20) {
     try {
         const response = await llmClient.chat({
             instructions:
-                "당신은 대화 요약 전문가입니다. 제공된 대화 내용을 핵심만 간결하게 요약하세요. 중요한 정보(이름, 숫자, 결정사항, 코드 등)는 반드시 포함하세요. 한국어로 작성하세요.",
-            messages: [{ role: "user", content: `다음 대화 내용을 핵심만 요약해주세요:\n\n${summaryInput}` }],
+                "You are a conversation summarizer. Summarize the provided conversation concisely while preserving important facts such as names, numbers, decisions, code details, and unresolved issues.",
+            messages: [{ role: "user", content: `Summarize the following conversation and preserve the important details:\n\n${summaryInput}` }],
             tools: [],
         });
 

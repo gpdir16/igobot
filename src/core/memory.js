@@ -78,18 +78,21 @@ class MemoryStore {
         return this._listFiles();
     }
 
-    // 모든 메모리 내용을 컨텍스트용으로 반환
-    getAllForContext() {
+    // 시스템 프롬프트 템플릿 치환용 메모리 컨텍스트
+    getAllForPrompt() {
         const files = this._listFiles();
-        if (files.length === 0) return "";
-
-        let context = "\n\n[저장된 메모리]\n";
-        for (const name of files) {
-            const content = this.get(name);
-            context += `\n### ${name}.md\n${content}\n`;
+        if (files.length === 0) {
+            return "- No saved memory.";
         }
-        return context;
+
+        return files
+            .map((name) => {
+                const content = this.get(name) || "";
+                return `### ${name}.md\n${content}`;
+            })
+            .join("\n\n");
     }
+
 }
 
 // 싱글턴

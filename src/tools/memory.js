@@ -45,7 +45,7 @@ export const memorySearch = {
 // 메모리 목록 도구 (내용 포함)
 export const memoryList = {
     name: "memory_list",
-    description: "Returns all memory files and their contents. Use to re-inject memories into context.",
+    description: "Returns all memory files and their contents for inspection.",
     requiresApproval: false,
     schema: {
         type: "object",
